@@ -1,0 +1,1362 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Minhas Hora$$</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Minhas Horas">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#102A43">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap">
+<style>
+/* Layout: app de uma coluna para celular. Faixa azul-marinho no topo, cartões brancos, navegação fixa embaixo. */
+:root{
+  --bg:#EEF2F6; --surface:#FFFFFF; --surface-2:#F6F8FB; --line:#DCE3EB;
+  --ink:#102A43; --muted:#5B6B7F; --brand:#102A43; --brand-ink:#FFFFFF;
+  --accent:#0E7C86; --accent-soft:#DDF1F2;
+  --money:#B26B00; --money-soft:#FCEFD9;
+  --par:#6A4FC7; --par-soft:#ECE7FB;
+  --ok:#1F8A4C; --warn:#B54708; --warn-soft:#FDEBDD; --danger:#C0352B;
+  --shadow:0 1px 2px rgba(16,42,67,.06),0 4px 14px rgba(16,42,67,.06);
+  --f-display:"Sora","Segoe UI",system-ui,sans-serif;
+  --f-body:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --r:14px; --nav-h:64px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0B1622; --surface:#122233; --surface-2:#0F1D2B; --line:#22364B;
+  --ink:#E4ECF4; --muted:#93A6BA; --brand:#0A1A2A; --brand-ink:#E4ECF4;
+  --accent:#3CC1C9; --accent-soft:#123A42;
+  --money:#F0B454; --money-soft:#3A2C12;
+  --par:#A994F5; --par-soft:#2A2350;
+  --ok:#4CC27E; --warn:#F2A15A; --warn-soft:#3B2614; --danger:#F07167;
+  --shadow:0 1px 2px rgba(0,0,0,.3); color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0B1622; --surface:#122233; --surface-2:#0F1D2B; --line:#22364B;
+  --ink:#E4ECF4; --muted:#93A6BA; --brand:#0A1A2A; --brand-ink:#E4ECF4;
+  --accent:#3CC1C9; --accent-soft:#123A42;
+  --money:#F0B454; --money-soft:#3A2C12;
+  --par:#A994F5; --par-soft:#2A2350;
+  --ok:#4CC27E; --warn:#F2A15A; --warn-soft:#3B2614; --danger:#F07167;
+  --shadow:0 1px 2px rgba(0,0,0,.3); color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--brand)}
+.wrap{max-width:760px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0}
+
+/* Topo */
+.top{background:var(--brand);color:var(--brand-ink);margin-top:calc(-1 * env(safe-area-inset-top,0px));padding-top:env(safe-area-inset-top,0px)}
+.top .wrap{padding-block:14px 16px;display:flex;align-items:center;gap:12px}
+.logo{width:36px;height:36px;border-radius:10px;background:var(--accent);display:grid;place-items:center;flex:none}
+.logo svg{width:20px;height:20px}
+.top h1{font-size:19px;font-weight:700;letter-spacing:-.01em}
+.top .sub{font-size:12.5px;opacity:.72}
+.sync{margin-left:auto;font-size:11.5px;display:flex;align-items:center;gap:6px;opacity:.85;white-space:nowrap}
+.sync i{width:8px;height:8px;border-radius:50%;background:#9FB3C8;display:inline-block}
+.sync.ok i{background:#4CC27E}.sync.err i{background:#F07167}
+
+main{padding-block:16px calc(var(--nav-h) + 28px + env(safe-area-inset-bottom,0px))}
+section.view{display:flex;flex-direction:column;gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px;min-width:0}
+.card h2{font-size:15.5px;font-weight:600}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.muted{color:var(--muted)}
+.small{font-size:12.5px}
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (min-width:620px){.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0}
+.kpi b{display:block;font-family:var(--f-display);font-size:21px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi.money b{color:var(--money)}
+.kpi small{color:var(--muted);font-size:11.5px}
+
+/* Comando */
+.composer{display:flex;gap:8px;align-items:flex-end}
+.composer textarea{flex:1;min-width:0;resize:none;border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;min-height:50px;max-height:140px;line-height:1.4}
+.composer textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.icon-btn{width:50px;height:50px;border-radius:12px;border:0;display:grid;place-items:center;flex:none}
+.icon-btn svg{width:22px;height:22px}
+.send{background:var(--accent);color:#fff}
+.mic{background:var(--surface-2);border:1px solid var(--line);color:var(--ink)}
+.mic.live{background:var(--danger);color:#fff;border-color:transparent;animation:pulse 1.4s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(192,53,43,.45)}70%{box-shadow:0 0 0 12px rgba(192,53,43,0)}100%{box-shadow:0 0 0 0 rgba(192,53,43,0)}}
+@media (prefers-reduced-motion:reduce){.mic.live{animation:none}}
+.partial{font-size:13px;color:var(--muted);min-height:0;margin-top:8px;font-style:italic}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chip{border:1px solid var(--line);background:var(--surface-2);border-radius:999px;padding:7px 12px;font-size:13px;text-align:left;max-width:100%}
+.chip:hover{border-color:var(--accent)}
+.hint{font-size:12.5px;color:var(--muted);margin-top:10px}
+
+.log{display:flex;flex-direction:column;gap:12px}
+.ex{display:flex;flex-direction:column;gap:6px}
+.q{align-self:flex-end;background:var(--brand);color:var(--brand-ink);padding:9px 13px;border-radius:14px 14px 4px 14px;max-width:88%;font-size:14px;overflow-wrap:anywhere}
+:root[data-theme="dark"] .q{background:#1D3A57}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .q{background:#1D3A57}}
+.a{align-self:flex-start;background:var(--surface-2);border:1px solid var(--line);padding:10px 13px;border-radius:14px 14px 14px 4px;max-width:92%;font-size:14px;overflow-wrap:anywhere}
+.a.err{border-color:var(--warn);background:var(--warn-soft)}
+.a .acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 12px;font-size:13.5px;font-weight:500}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--danger)}
+.btn.danger.armed{background:var(--danger);color:#fff;border-color:var(--danger)}
+.btn:disabled{opacity:.5;cursor:default}
+.when{font-size:11px;color:var(--muted)}
+.empty{text-align:center;padding:22px 10px;color:var(--muted)}
+.empty b{display:block;color:var(--ink);font-family:var(--f-display);font-weight:600;margin-bottom:4px}
+
+/* Navegação de período */
+.pager{display:flex;align-items:center;gap:8px}
+.pager button{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center}
+.pager span{font-weight:600;font-size:14px;min-width:0;text-align:center;flex:1}
+.pager .today{width:auto;padding:0 10px;font-size:12.5px}
+
+/* Grade semanal */
+.table-wrap{overflow-x:auto;margin:0 -16px;padding:0 16px;-webkit-overflow-scrolling:touch}
+table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:560px;font-size:13.5px}
+.grid th,.grid td{padding:9px 6px;text-align:center;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.grid thead th{font-size:11.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.grid thead th.is-today{color:var(--accent)}
+.grid th:first-child,.grid td:first-child{text-align:left;position:sticky;left:0;background:var(--surface);min-width:140px;max-width:170px;padding-left:0;z-index:1}
+.grid td.cell button{width:100%;border:0;background:transparent;border-radius:8px;padding:6px 2px;font-variant-numeric:tabular-nums}
+.grid td.cell button:hover{background:var(--surface-2)}
+.grid td.cell.has button{background:var(--accent-soft);color:var(--ink);font-weight:600}
+.grid td.cell.wknd{background:var(--surface-2)}
+.grid tfoot td{font-weight:700;border-bottom:0}
+.grid td.tot{font-weight:600}
+.pname{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pcode{display:block;font-size:11.5px;color:var(--muted)}
+
+/* Previsão */
+.forecast{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.forecast{grid-template-columns:1fr}
+@media (min-width:480px){.forecast{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.fbox{border-radius:12px;padding:14px;min-width:0}
+.fbox.real{background:var(--accent-soft)}
+.fbox.proj{background:var(--money-soft)}
+.fbox b{display:block;font-family:var(--f-display);font-size:clamp(18px,5.4vw,24px);white-space:nowrap;font-weight:600;font-variant-numeric:tabular-nums;margin-top:4px;overflow:hidden;text-overflow:ellipsis}
+.fbox.proj b{color:var(--money)}
+.fbox small{font-size:12px;color:var(--muted)}
+.rows{display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:11px 0;border-bottom:1px solid var(--line);align-items:center}
+.row:last-child{border-bottom:0}
+.row .r{text-align:right;font-variant-numeric:tabular-nums}
+.row .r b{display:block}
+.note{font-size:12.5px;color:var(--muted);background:var(--surface-2);border-radius:10px;padding:10px 12px}
+.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field label{font-size:12px;font-weight:600;color:var(--muted)}
+.field input,.field select{border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:10px 12px;width:100%;min-width:0}
+.field input:focus,.field select:focus{outline:none;border-color:var(--accent)}
+
+/* Projetos */
+.plist{display:flex;flex-direction:column;gap:10px}
+.proj{border:1px solid var(--line);border-radius:12px;padding:13px 14px;background:var(--surface);text-align:left;width:100%;display:flex;flex-direction:column;gap:8px}
+.proj:hover{border-color:var(--accent)}
+.proj-top{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+.proj-top > div{min-width:0}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;border-radius:999px;padding:3px 9px;white-space:nowrap}
+.pill.run{background:var(--accent-soft);color:var(--accent)}
+.pill.fut{background:var(--par-soft);color:var(--par)}
+.pill.done{background:var(--surface-2);color:var(--muted)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.pri{background:var(--accent);color:#fff}
+.pill.par{background:var(--par-soft);color:var(--par)}
+.pill.money{background:var(--money-soft);color:var(--money)}
+.meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted)}
+.meta b{color:var(--ink);font-weight:600}
+.bar{height:6px;border-radius:99px;background:var(--surface-2);border:1px solid var(--line);position:relative;overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;background:var(--accent);border-radius:99px}
+.bar.open i{background:repeating-linear-gradient(90deg,var(--warn) 0 6px,transparent 6px 10px)}
+
+/* Agenda */
+.ag{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line)}
+.ag:last-child{border-bottom:0}
+.ag .sw{width:4px;align-self:stretch;border-radius:4px;background:var(--accent);flex:none}
+.ag.paralelo .sw{background:var(--par)}
+.ag .body{flex:1;min-width:0}
+.ag .t{font-weight:600}
+.ag .acts{display:flex;gap:6px;flex:none}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:6px}
+.cal .h{font-size:11px;color:var(--muted);text-align:center;font-weight:600;padding:4px 0}
+.cal .d{aspect-ratio:1/1;max-width:100%;border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:13px;font-variant-numeric:tabular-nums;background:var(--surface-2);position:relative;gap:3px}
+.cal .d.out{visibility:hidden}
+.cal .d.wk{opacity:.5}
+.cal .d.free{background:transparent;border:1px dashed var(--ok);color:var(--ok);font-weight:600}
+.cal .d.pri{background:var(--accent);color:#fff}
+.cal .d.parx{background:var(--par-soft);color:var(--par);font-weight:600}
+.cal .d.today{box-shadow:0 0 0 2px var(--ink) inset}
+.cal .d .dots{display:flex;gap:2px;height:5px}
+.cal .d .dots i{width:5px;height:5px;border-radius:50%;background:var(--par)}
+.cal .d.pri .dots i{background:#fff}
+.legend{display:flex;flex-wrap:wrap;gap:10px 16px;font-size:12px;color:var(--muted);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:12px;height:12px;border-radius:4px;display:inline-block}
+.free-list{display:flex;flex-wrap:wrap;gap:8px}
+.free-list span{border:1px dashed var(--ok);color:var(--ok);border-radius:999px;padding:5px 11px;font-size:13px;font-weight:600}
+
+/* Navegação inferior */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(6px,env(safe-area-inset-left,0px));padding-right:max(6px,env(safe-area-inset-right,0px))}
+nav.tabs .in{max-width:760px;margin:0 auto;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));height:var(--nav-h)}
+nav.tabs a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--muted);text-decoration:none;font-size:11px;font-weight:600}
+nav.tabs a svg{width:22px;height:22px}
+nav.tabs a[aria-current="page"]{color:var(--accent)}
+
+/* Folha (modal) */
+.sheet-bg{position:fixed;inset:0;background:rgba(8,20,32,.45);z-index:40;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);width:100%;max-width:560px;border-radius:18px 18px 0 0;padding:18px max(16px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:12px;max-height:88vh;overflow:auto}
+.sheet h3{font-size:17px}
+.sheet .acts{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:4px}
+.check{display:flex;align-items:center;gap:8px;font-size:14px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--nav-h) + 14px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:13.5px;z-index:50;max-width:calc(100% - 32px)}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+    <div>
+      <h1>Minhas Hora$$</h1>
+      <div class="sub" id="todayLabel"></div>
+    </div>
+    <div class="sync" id="sync"><i></i><span>Salvo neste aparelho</span></div>
+  </div>
+</header>
+
+<main class="wrap" id="main">
+  <!-- COMANDOS -->
+  <section class="view" id="v-comandos">
+    <div class="kpis" id="kpis"></div>
+    <div class="card">
+      <form class="composer" id="cmdForm" autocomplete="off">
+        <textarea id="cmd" rows="1" placeholder="Ex.: apontar 8 horas no projeto GRSRJ-466 Oncologia Nova Iguaçu" aria-label="Comando"></textarea>
+        <button type="button" class="icon-btn mic" id="micBtn" aria-label="Falar comando" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        </button>
+        <button type="submit" class="icon-btn send" aria-label="Enviar comando">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </form>
+      <div class="partial" id="partial" hidden></div>
+      <div class="hint" id="micHint"></div>
+      <div class="chips" id="examples"></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>Conversa</h2><span class="small muted" id="logCount"></span></div>
+      <div class="log" id="log"></div>
+    </div>
+  </section>
+
+  <!-- HORAS -->
+  <section class="view" id="v-horas" hidden>
+    <div class="card">
+      <div class="card-h" style="margin-bottom:6px">
+        <h2>Horas apontadas</h2>
+        <span class="pill money num" id="weekTotalPill"></span>
+      </div>
+      <div class="pager" style="margin-bottom:10px">
+        <button type="button" id="wPrev" aria-label="Semana anterior">‹</button>
+        <span id="wLabel" class="num"></span>
+        <button type="button" id="wNext" aria-label="Próxima semana">›</button>
+        <button type="button" class="today" id="wToday">Hoje</button>
+      </div>
+      <div id="weekGrid"></div>
+      <p class="hint">Toque em um dia para corrigir ou apagar as horas daquele projeto.</p>
+    </div>
+  </section>
+
+  <!-- PREVISÃO -->
+  <section class="view" id="v-previsao" hidden>
+    <div class="card">
+      <div class="card-h"><h2>Previsão mensal</h2></div>
+      <div class="pager" style="margin-bottom:12px">
+        <button type="button" id="mPrev" aria-label="Mês anterior">‹</button>
+        <span id="mLabel"></span>
+        <button type="button" id="mNext" aria-label="Próximo mês">›</button>
+        <button type="button" class="today" id="mToday">Atual</button>
+      </div>
+      <div class="forecast" id="fBoxes"></div>
+      <div class="rows" id="fRows" style="margin-top:8px"></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>Como calculo</h2></div>
+      <p class="note" id="fNote" style="margin:0 0 12px"></p>
+      <div class="settings">
+        <div class="field"><label for="setRate">Valor hora padrão (R$)</label><input id="setRate" type="number" step="0.01" min="0" inputmode="decimal"></div>
+        <div class="field"><label for="setHp">Média padrão/dia, principal</label><input id="setHp" type="number" step="0.5" min="0" inputmode="decimal"></div>
+        <div class="field"><label for="setHpar">Média padrão/dia, paralelo</label><input id="setHpar" type="number" step="0.5" min="0" inputmode="decimal"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>Backup dos dados</h2></div>
+      <p class="small muted" style="margin:0 0 12px">Use para guardar uma cópia ou levar seus dados para outro aparelho ou para o app instalado. Copie aqui e cole em "Restaurar" do outro lado.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn" id="bkCopy">Copiar backup</button><button type="button" class="btn" id="bkRestore">Restaurar backup</button></div>
+    </div>
+  </section>
+
+  <!-- PROJETOS -->
+  <section class="view" id="v-projetos" hidden>
+    <div class="card">
+      <div class="card-h"><h2>Projetos</h2><span class="small muted" id="projCount"></span></div>
+      <div class="plist" id="plist"></div>
+    </div>
+  </section>
+
+  <!-- AGENDA -->
+  <section class="view" id="v-agenda" hidden>
+    <div class="card">
+      <div class="card-h"><h2>Agenda atual</h2></div>
+      <div id="agNow"></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>Agenda prevista</h2></div>
+      <div id="agNext"></div>
+    </div>
+    <div class="card">
+      <div class="card-h">
+        <h2>Agenda disponível</h2>
+      </div>
+      <div class="pager" style="margin-bottom:4px">
+        <button type="button" id="cPrev" aria-label="Mês anterior">‹</button>
+        <span id="cLabel"></span>
+        <button type="button" id="cNext" aria-label="Próximo mês">›</button>
+      </div>
+      <div class="cal" id="cal"></div>
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i>Projeto principal</span>
+        <span><i style="background:var(--par-soft);border:1px solid var(--par)"></i>Só paralelo</span>
+        <span><i style="border:1px dashed var(--ok)"></i>Livre</span>
+      </div>
+      <div style="margin-top:14px">
+        <div class="eyebrow" style="margin-bottom:8px">Livre para novos projetos (próximas 8 semanas, dias úteis)</div>
+        <div class="free-list" id="freeList"></div>
+      </div>
+    </div>
+    <div class="card" id="agPastCard" hidden>
+      <div class="card-h"><h2>Encerradas</h2></div>
+      <div id="agPast"></div>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs" aria-label="Seções">
+  <div class="in">
+    <a href="#comandos" data-v="comandos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg>Comandos</a>
+    <a href="#horas" data-v="horas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 10h18M9 4v17M15 4v17"/></svg>Horas</a>
+    <a href="#previsao" data-v="previsao"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Previsão</a>
+    <a href="#projetos" data-v="projetos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h6l2 2h10v10H3z"/></svg>Projetos</a>
+    <a href="#agenda" data-v="agenda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Agenda</a>
+  </div>
+</nav>
+
+<div id="sheetHost"></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ============ utilidades ============ */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-5);
+const pad = n => String(n).padStart(2, '0');
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parseISO = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const todayISO = () => iso(new Date());
+const addDays = (s, n) => { const d = parseISO(s); d.setDate(d.getDate() + n); return iso(d); };
+const dow = s => parseISO(s).getDay();
+const isWeekday = s => { const w = dow(s); return w > 0 && w < 6; };
+const weekStart = s => { const w = dow(s); return addDays(s, w === 0 ? -6 : 1 - w); };
+const monthStart = s => s.slice(0, 8) + '01';
+const monthEnd = s => { const d = parseISO(monthStart(s)); d.setMonth(d.getMonth() + 1); d.setDate(0); return iso(d); };
+const addMonths = (s, n) => { const d = parseISO(monthStart(s)); d.setMonth(d.getMonth() + n); return iso(d); };
+const daysIn = (y, m) => new Date(y, m, 0).getDate();
+const WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+const MN = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const fmtD = s => { const d = parseISO(s); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`; };
+const fmtDY = s => fmtD(s) + '/' + s.slice(0, 4);
+const fmtDay = s => {
+  const t = todayISO();
+  if (s === t) return 'hoje (' + fmtD(s) + ')';
+  if (s === addDays(t, -1)) return 'ontem (' + fmtD(s) + ')';
+  return WD[dow(s)] + ', ' + fmtD(s);
+};
+const monthLabel = s => { const d = parseISO(s); return MN[d.getMonth()][0].toUpperCase() + MN[d.getMonth()].slice(1) + ' de ' + d.getFullYear(); };
+const fmtH = h => { const r = Math.round(h * 100) / 100; return r.toLocaleString('pt-BR', {maximumFractionDigits: 2}) + 'h'; };
+const BRL = new Intl.NumberFormat('pt-BR', {style: 'currency', currency: 'BRL'});
+const money = v => BRL.format(v || 0);
+const strip = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+const titleCase = s => String(s || '').trim().replace(/\s+/g, ' ').split(' ').filter(Boolean).map(w => /^(da|de|do|das|dos|e)$/i.test(w) ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1)).join(' ');
+const clone = o => JSON.parse(JSON.stringify(o));
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2600); }
+
+/* ============ estado ============ */
+const LS = 'minhas-horas-v1';
+const fresh = () => ({
+  v: 1, updatedAt: 0,
+  settings: {rate: 65, hp: 8, hpar: 2},
+  principalId: null,
+  projects: [], entries: [], agendas: [], log: []
+});
+function migrate(d) {
+  const b = fresh();
+  if (!d || typeof d !== 'object') return b;
+  const o = Object.assign(b, d);
+  o.settings = Object.assign(fresh().settings, d.settings || {});
+  for (const k of ['projects', 'entries', 'agendas', 'log']) if (!Array.isArray(o[k])) o[k] = [];
+  return o;
+}
+let S = fresh();
+try { const raw = localStorage.getItem(LS); if (raw) S = migrate(JSON.parse(raw)); } catch (e) {}
+const hasData = s => s.projects.length || s.entries.length || s.agendas.length;
+
+let dbRef = null, saving = false, dirty = false, saveTimer = null;
+function setSync(kind) {
+  const el = $('#sync'); el.className = 'sync ' + (kind === 'ok' ? 'ok' : kind === 'err' ? 'err' : '');
+  el.querySelector('span').textContent = kind === 'ok' ? 'Salvo na nuvem' : kind === 'err' ? 'Não salvou na nuvem' : kind === 'wait' ? 'Conectando…' : 'Salvo neste aparelho';
+}
+function persist() {
+  S.updatedAt = Date.now();
+  if (S.log.length > 60) S.log = S.log.slice(-60);
+  try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {}
+  dirty = true; clearTimeout(saveTimer); saveTimer = setTimeout(flush, 600);
+}
+async function flush() {
+  if (!dbRef || saving || !dirty) return;
+  saving = true; dirty = false;
+  try { await dbRef.set(clone(S)); setSync('ok'); }
+  catch (e) { setSync('err'); }
+  finally { saving = false; if (dirty) saveTimer = setTimeout(flush, 800); }
+}
+
+const undoStack = [];
+function snapshot() { undoStack.push(JSON.stringify({...S, log: undefined})); if (undoStack.length > 15) undoStack.shift(); }
+function undo() {
+  const prev = undoStack.pop();
+  if (!prev) return false;
+  const log = S.log; S = migrate(JSON.parse(prev)); S.log = log; return true;
+}
+
+/* ============ consultas ============ */
+const proj = id => S.projects.find(p => p.id === id) || null;
+const pLabel = p => p ? (p.code ? p.code + ' · ' + p.name : p.name) : 'Sem projeto';
+const rateOf = p => (p && typeof p.rate === 'number' && p.rate >= 0) ? p.rate : S.settings.rate;
+const hoursOn = (pid, date) => S.entries.filter(e => e.projectId === pid && e.date === date).reduce((a, e) => a + e.hours, 0);
+const dayTotal = date => S.entries.filter(e => e.date === date).reduce((a, e) => a + e.hours, 0);
+const sumRange = (a, b) => S.entries.filter(e => e.date >= a && e.date <= b).reduce((s, e) => s + e.hours, 0);
+const valueRange = (a, b) => S.entries.filter(e => e.date >= a && e.date <= b).reduce((s, e) => s + e.hours * rateOf(proj(e.projectId)), 0);
+const agendasOn = date => S.agendas.filter(a => a.from <= date && a.to >= date);
+function principalFor(date) {
+  const a = S.agendas.filter(a => a.type === 'principal' && a.projectId && proj(a.projectId) && a.from <= date && a.to >= date)
+    .sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0))[0];
+  if (a) return proj(a.projectId);
+  return proj(S.principalId) || (S.projects.length === 1 ? S.projects[0] : null);
+}
+function projDates(p) {
+  const es = S.entries.filter(e => e.projectId === p.id);
+  const ags = S.agendas.filter(a => a.projectId === p.id);
+  const starts = [p.start, ...es.map(e => e.date), ...ags.map(a => a.from)].filter(Boolean).sort();
+  let end = null, src = null;
+  if (ags.length) { end = ags.map(a => a.to).sort().pop(); src = 'agenda'; }
+  else if (p.end) { end = p.end; src = 'manual'; }
+  const hours = es.reduce((a, e) => a + e.hours, 0);
+  const mgrs = [...new Set(ags.map(a => a.manager).filter(Boolean))];
+  if (p.manager && !mgrs.includes(p.manager)) mgrs.unshift(p.manager);
+  return {start: starts[0] || null, end, src, hours, mgrs};
+}
+function monthStats(ms) {
+  const me = monthEnd(ms), t = todayISO();
+  const rows = new Map();
+  const row = (key, label, sub, rate) => { if (!rows.has(key)) rows.set(key, {key, label, sub, rate, rh: 0, rv: 0, fh: 0, fv: 0}); return rows.get(key); };
+  for (const e of S.entries) {
+    if (e.date < ms || e.date > me) continue;
+    const p = proj(e.projectId); const r = row(e.projectId, pLabel(p), p && p.code ? '' : '', rateOf(p));
+    r.rh += e.hours; r.rv += e.hours * rateOf(p);
+  }
+  let start = dayTotal(t) > 0 ? addDays(t, 1) : t;
+  if (ms > start) start = ms;
+  for (let d = start; d <= me; d = addDays(d, 1)) {
+    if (!isWeekday(d)) continue;
+    for (const a of agendasOn(d)) {
+      const h = a.hpd > 0 ? a.hpd : (a.type === 'principal' ? S.settings.hp : S.settings.hpar);
+      if (!h) continue;
+      const p = a.projectId ? proj(a.projectId) : null;
+      const key = p ? p.id : 'mgr:' + strip(a.manager || '');
+      const r = row(key, p ? pLabel(p) : 'Agenda sem projeto' + (a.manager ? ' (' + a.manager + ')' : ''), '', rateOf(p));
+      r.fh += h; r.fv += h * rateOf(p);
+    }
+  }
+  const list = [...rows.values()].sort((a, b) => (b.rv + b.fv) - (a.rv + a.fv));
+  const tot = list.reduce((s, r) => ({rh: s.rh + r.rh, rv: s.rv + r.rv, fh: s.fh + r.fh, fv: s.fv + r.fv}), {rh: 0, rv: 0, fh: 0, fv: 0});
+  return {list, tot, start, me};
+}
+
+/* ============ interpretador de comandos ============ */
+// Texto com versão normalizada do mesmo comprimento (sem acentos, minúsculas), para casar padrões e recortar o original.
+class Txt {
+  constructor(s) {
+    this.o = String(s).normalize('NFC');
+    let n = '';
+    for (let i = 0; i < this.o.length; i++) {
+      let c = this.o[i].normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+      n += c.length === 1 ? c : (c[0] || ' ');
+    }
+    this.n = n;
+  }
+  cut(s, e) { const sp = ' '.repeat(e - s); this.o = this.o.slice(0, s) + sp + this.o.slice(e); this.n = this.n.slice(0, s) + sp + this.n.slice(e); }
+  take(re, back) {
+    const m = re.exec(this.n); if (!m) return null;
+    let s = m.index; const e = s + m[0].length;
+    if (back) { const pre = /(?:\b(?:para|pra|pro|em|no|na|de|do|da|ao|referente\s+a|referentes?\s+ao?)\s+)+$/.exec(this.n.slice(0, s)); if (pre) s = pre.index; }
+    const o0 = this.o;
+    m.orig = o0.slice(m.index, e);
+    m.go = g => (m.indices && m.indices[g]) ? o0.slice(m.indices[g][0], m.indices[g][1]) : (m[g] || '');
+    this.cut(s, e); return m;
+  }
+  rest() { return this.o.replace(/\s+/g, ' ').trim(); }
+  restN() { return this.n.replace(/\s+/g, ' ').trim(); }
+}
+
+const NUMW = {um:1, uma:1, dois:2, duas:2, 'três':3, tres:3, quatro:4, cinco:5, seis:6, sete:7, oito:8, nove:9, dez:10, onze:11, doze:12, treze:13, catorze:14, quatorze:14, quinze:15, dezesseis:16};
+function preNumbers(s) {
+  s = s.replace(/\bmeia\s+hora\b/gi, '0,5 hora');
+  s = s.replace(new RegExp('(^|[^\\p{L}])(' + Object.keys(NUMW).join('|') + ')(?=\\s+(?:horas?|hrs?)(?![\\p{L}]))', 'giu'), (m, p, w) => p + NUMW[w.toLowerCase()]);
+  return s;
+}
+function parseHours(t) {
+  let m = t.take(/\b(\d{1,2})\s*h\s*(\d{2})\b(?:\s*min(?:utos)?)?/);
+  if (m) return +m[1] + (+m[2]) / 60;
+  m = t.take(/\b(\d+(?:[.,]\d+)?)\s*(?:horas?|hrs?|h)\b(?:\s+e\s+(meia|(\d{1,2})\s*(?:min(?:utos)?)?))?(?:\s+(?:trabalhadas?|de\s+trabalho))?/);
+  if (m) { let h = parseFloat(m[1].replace(',', '.')); if (m[2] === 'meia') h += 0.5; else if (m[3]) h += (+m[3]) / 60; return h; }
+  m = t.take(/\b(\d{1,3})\s*min(?:utos)?\b/);
+  if (m) return (+m[1]) / 60;
+  return null;
+}
+const MONTHS = {janeiro:1, jan:1, fevereiro:2, fev:2, marco:3, mar:3, abril:4, abr:4, maio:5, mai:5, junho:6, jun:6, julho:7, jul:7, agosto:8, ago:8, setembro:9, set:9, outubro:10, out:10, novembro:11, nov:11, dezembro:12, dez:12};
+const MRE = '(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro|jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\\b';
+const mk = (y, m, d) => (m >= 1 && m <= 12 && d >= 1 && d <= daysIn(y, m)) ? `${y}-${pad(m)}-${pad(d)}` : null;
+const yFix = y => y ? (y < 100 ? 2000 + y : y) : null;
+
+// Data única. mode 'past' (apontamento) ou 'future' (agenda/término)
+function parseDate(t, mode) {
+  const now = todayISO(), cy = +now.slice(0, 4), cm = +now.slice(5, 7);
+  let m;
+  if ((m = t.take(/\b(anteontem|antes\s+de\s+ontem)\b/, true))) return addDays(now, -2);
+  if ((m = t.take(/\bontem\b/, true))) return addDays(now, -1);
+  if ((m = t.take(/\bhoje\b/, true))) return now;
+  if ((m = t.take(/\bamanha\b/, true))) return addDays(now, 1);
+  if ((m = t.take(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/, true))) {
+    const y = yFix(+m[3]) || cy; let d = mk(y, +m[2], +m[1]);
+    if (d && !m[3]) d = adjustYear(d, mode);
+    return d;
+  }
+  if ((m = t.take(new RegExp('\\b(?:dia\\s+)?(\\d{1,2})\\s+de\\s+' + MRE + '(?:\\s+de\\s+(\\d{4}))?'), true))) {
+    const y = +m[3] || cy; let d = mk(y, MONTHS[m[2]], +m[1]);
+    if (d && !m[3]) d = adjustYear(d, mode);
+    return d;
+  }
+  if ((m = t.take(/\bdia\s+(\d{1,2})\b/, true))) {
+    let d = mk(cy, cm, +m[1]);
+    if (d && mode === 'past' && d > now) { const pm = addMonths(now, -1); d = mk(+pm.slice(0, 4), +pm.slice(5, 7), +m[1]); }
+    if (d && mode === 'future' && d < now) { const nm = addMonths(now, 1); d = mk(+nm.slice(0, 4), +nm.slice(5, 7), +m[1]); }
+    return d;
+  }
+  if ((m = t.take(/\b(?:(?:na|no|nesta|neste|ultima|ultimo)\s+)?(segunda|terca|quarta|quinta|sexta|sabado|domingo)(?:[-\s]feira)?(?:\s+passad[ao])?\b/, true))) {
+    const idx = {domingo:0, segunda:1, terca:2, quarta:3, quinta:4, sexta:5, sabado:6}[m[1]];
+    let diff = dow(now) - idx;
+    if (mode === 'future') { diff = idx - dow(now); if (diff < 0) diff += 7; return addDays(now, diff); }
+    if (diff < 0) diff += 7;
+    return addDays(now, -diff);
+  }
+  return undefined;
+}
+function adjustYear(d, mode) {
+  const now = todayISO();
+  if (mode === 'past' && d > now) return (+d.slice(0, 4) - 1) + d.slice(4);
+  if (mode === 'future' && d < addDays(now, -45)) return (+d.slice(0, 4) + 1) + d.slice(4);
+  return d;
+}
+const DPART = '(?:o\\s+)?(?:dia\\s+)?(\\d{1,2})(?:\\s+de\\s+' + MRE + '|\\/(\\d{1,2}))?(?:\\s+de\\s+(\\d{4})|\\/(\\d{2,4}))?';
+const RANGE_RE = new RegExp('(?:\\b(?:no|para\\s+o|pelo|durante\\s+o|nesse|neste)\\s+)?(?:\\bperiodo\\s+)?(?:\\b(?:de|do|dos\\s+dias|entre|desde)\\s+)?\\b' + DPART + '\\s*(?:\\b(?:a|ate|e|ao)\\b|-)\\s*' + DPART);
+function parseRange(t) {
+  const m = t.take(RANGE_RE);
+  if (!m) return null;
+  const now = todayISO(), cy = +now.slice(0, 4), cm = +now.slice(5, 7);
+  const d1 = +m[1], mo1 = m[2] ? MONTHS[m[2]] : (m[3] ? +m[3] : null), y1 = yFix(+m[4] || +m[5]);
+  const d2 = +m[6], mo2 = m[7] ? MONTHS[m[7]] : (m[8] ? +m[8] : null), y2 = yFix(+m[9] || +m[10]);
+  const M2 = mo2 || mo1 || cm, M1 = mo1 || M2;
+  let Y2 = y2 || y1 || cy;
+  let to = mk(Y2, M2, d2);
+  if (!to) return {error: true};
+  if (!y2 && !y1 && to < addDays(now, -45)) { Y2++; to = mk(Y2, M2, d2); }
+  let Y1 = y1 || (M1 > M2 ? Y2 - 1 : Y2);
+  const from = mk(Y1, M1, d1);
+  if (!from) return {error: true};
+  return from <= to ? {from, to} : {from: to, to: from};
+}
+function splitCode(raw) {
+  raw = String(raw || '').replace(/^[\s,.:;-]+|[\s,.:;!?-]+$/g, '');
+  const m = /\b([A-Za-z]{2,}[A-Za-z0-9]*-\d+[A-Za-z0-9]*)\b/.exec(raw);
+  let code = null, name = raw;
+  if (m) { code = m[1].toUpperCase(); name = (raw.slice(0, m.index) + ' ' + raw.slice(m.index + m[0].length)).replace(/^[\s\-–·:]+|[\s\-–·:]+$/g, '').replace(/\s+/g, ' '); }
+  return {code, name: name.trim()};
+}
+const LEAD_PREP = /^\s*(?:(?:no|na|nos|em|para|pra|pro|ao|do|da|o|a|com)\s+)*(?:(?:o|a)\s+)?(?:projeto\s+)?/i;
+
+function parseCommand(input) {
+  const raw0 = String(input || '').trim();
+  if (!raw0) return null;
+  const raw = preNumbers(raw0);
+  const n = strip(raw);
+
+  if (/^(desfaz|desfazer|desfaca|desfaça|voltar)\b/.test(n)) return {intent: 'desfazer'};
+  if (/\b(quantas horas|resumo|quanto (eu )?(ja )?(ganhei|tenho|faturei))\b/.test(n)) return {intent: 'consulta'};
+
+  const isAgenda = /\b(agenda|reserv\w*|alocad\w*|alocacao|bloque\w*)\b/.test(n);
+  if (isAgenda) {
+    const adjust = /\b(ajust\w*|alter\w*|mud\w*|corrig\w*|atualiz\w*|troc\w*|edit\w*|vincul\w*)\b/.test(n);
+    return parseAgenda(raw, adjust);
+  }
+  if (/\b(defin\w*|mud\w*|troc\w*|coloc\w*|set\w*)\b.*\bprojeto\s+principal\b|\bprojeto\s+principal\s+(e|sera|passa)\b/.test(n)) {
+    const t = new Txt(raw);
+    t.take(/^.*?\bprojeto\s+principal\b(?:\s+(?:e|sera|para|como|passa\s+a\s+ser))?/);
+    const ref = splitCode(t.rest().replace(LEAD_PREP, ''));
+    return {intent: 'principal', project: (ref.code || ref.name) ? ref : null};
+  }
+  if (/\b(valor|taxa|preco)\b.*\bhora\b|\bpor\s+hora\b/.test(n)) {
+    const v = /(\d+(?:[.,]\d{1,2})?)/.exec(n);
+    const t = new Txt(raw); let ref = null;
+    const pm = t.take(/\bprojeto\s+(.+?)(?=\s+(?:para|pra|e|sera|passa|de|em|com|r\$|\d)|\s*$)/d);
+    if (pm) ref = splitCode(pm.go(1));
+    return {intent: 'valor', value: v ? parseFloat(v[1].replace(',', '.')) : null, project: ref};
+  }
+  if (/\b(termino|termina|terminar|fim|encerr\w*|finaliz\w*)\b/.test(n) && /\bprojeto\b/.test(n) && !/\bhoras?\b/.test(n)) {
+    const t = new Txt(raw);
+    let d = parseDate(t, 'future');
+    const r = d === undefined ? parseRange(t) : null;
+    if (r && r.to) d = r.to;
+    const pm = t.take(/\bprojeto\s+(.+?)(?=\s+(?:para|pra|e|sera|em|no|na|dia|como)\b|\s*$)/d);
+    return {intent: 'termino', date: d || null, project: pm ? splitCode(pm.go(1)) : null};
+  }
+
+  // Apontamento de horas
+  const t = new Txt(raw);
+  const hours = parseHours(t);
+  if (hours === null) return null;
+  let mode = 'perguntar';
+  if (/\b(mais|adicion\w*|acrescent\w*|som\w*)\b/.test(n)) mode = 'somar';
+  if (/\b(corrig\w*|substitu\w*|ajust\w*|total\s+de|no\s+total|troc\w*|mud\w*\s+para)\b/.test(n)) mode = 'substituir';
+  const date = parseDate(t, 'past');
+  t.take(/^\s*(?:por\s+favor\s*,?\s*)?(?:apont\w*|lanc\w*|registr\w*|adicion\w*|acrescent\w*|coloc\w*|inclu\w*|marc\w*|som\w*|corrig\w*|substitu\w*|ajust\w*|trabalhei|fiz|bot\w*|pont\w*)\b/);
+  t.take(/\b(?:mais|mas|no\s+total|um\s+total\s+de|total\s+de|para|pra)\s*$/);
+  t.take(/^\s*(?:mais|um\s+total\s+de|total\s+de)\b/);
+  let rest = t.rest().replace(LEAD_PREP, '').replace(/^\s*(?:mais)\s+/i, '').replace(/[\s,.;:!?]+$/g, '').trim();
+  rest = rest.replace(/^(?:o|a)\s+(?:projeto\s+)?/i, '').trim();
+  const isPrincipalWord = /^(?:projeto\s+)?principal$/i.test(rest);
+  const ref = rest && !isPrincipalWord ? splitCode(rest) : null;
+  return {intent: 'apontar', hours, date: date === undefined ? null : date, dateInvalid: date === null, mode, project: ref && (ref.code || ref.name) ? ref : null};
+}
+
+function parseAgenda(raw, adjust) {
+  const t = new Txt(raw);
+  let type = null, m, hpd = null;
+  if ((m = t.take(/(?:\b(?:com|de|a|em)\s+)?\b(\d+(?:[.,]\d+)?)\s*(?:horas?|hrs?|h)\s*(?:por|\/|ao|a|cada)\s*dia\b|\b(\d+(?:[.,]\d+)?)\s*(?:horas?|h)\s+diarias\b/))) hpd = parseFloat((m[1] || m[2]).replace(',', '.'));
+  if ((m = t.take(/(?:\b(?:como|de|do|no|para\s+o|em)\s+)?(?:\bo\s+)?(?:\bprojeto\s+)?\b(principal|paralelo|secundario)\b/))) type = m[1] === 'principal' ? 'principal' : 'paralelo';
+  const range = parseRange(t);
+  let single;
+  if (!range) single = parseDate(t, 'future');
+  t.take(/^\s*(?:por\s+favor\s*,?\s*)?(?:(?:registr|reserv|cri|adicion|ajust|alter|mud|corrig|atualiz|marc|bloque|agend|lanc|inclu|coloc|troc|edit|vincul|fac|faz|prev)\w*\s+)?(?:(?:a|uma|nova)\s+)?(?:previsao\s+(?:de\s+)?)?(?:(?:a|da|de)\s+)?(?:agenda|reserva)?(?:\s+prevista)?/);
+  let project = null;
+  const pm = t.take(/(?:\b(?:como|no|na|para\s+o|pro|do|ao|com\s+o|ligad[ao]\s+ao|vinculad[ao]\s+ao)\s+)?(?:\bo\s+)?\bprojeto\s+(.+?)(?=\s+(?:para|pra|da|do|de|no|na|entre|durante|desde|como|com|periodo|gerente)\b|\s*[,;]|\s*$)/d);
+  if (pm) project = splitCode(pm.go(1));
+  let manager = null;
+  const mm = t.take(/\b(?:para|pra|da|do|com|gerente)\s+(?:(?:a|o)\s+)?(?:gerente\s+)?([a-z][a-z'\-]*(?:\s+(?!(?:no|na|em|de|do|da|como|para|entre|durante|periodo|ate|a|e|o|com|pelo)\b)[a-z][a-z'\-]*){0,3})/d);
+  if (mm) manager = titleCase(mm.go(1));
+  if (!project) {
+    const cm = t.take(/\bcomo\s+(?:o\s+)?(.+?)(?=\s+(?:para|pra|da|do|de|no|na|entre|periodo)\b|\s*[,;]|\s*$)/d);
+    if (cm) project = splitCode(cm.go(1));
+  }
+  if (!manager) {
+    const left = t.rest().replace(/\b(?:no|na|em|de|do|da|como|para|entre|durante|o|a|periodo|período|gerente)\b/gi, ' ').replace(/[,.;:!?]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (left && left.split(' ').length <= 3 && /^[\p{L}' -]+$/u.test(left)) manager = titleCase(left);
+  }
+  let from = null, to = null, rangeError = false;
+  if (range && range.error) rangeError = true;
+  else if (range) { from = range.from; to = range.to; }
+  else if (single) { from = to = single; }
+  else if (single === null) rangeError = true;
+  return {intent: adjust ? 'agenda_ajustar' : 'agenda_criar', manager, project, type, from, to, rangeError, hpd};
+}
+
+/* ---- IA (Claude) para frases fora do padrão ---- */
+let sample = null;
+async function aiParse(text) {
+  if (!sample) return null;
+  const t = todayISO();
+  const prompt = `Você interpreta comandos em português do Brasil de um app pessoal de apontamento de horas de projetos.
+Hoje é ${t} (${WD[dow(t)]}). Semana começa na segunda.
+Projetos cadastrados: ${S.projects.map(p => pLabel(p)).join('; ') || 'nenhum'}.
+Gerentes com agenda: ${[...new Set(S.agendas.map(a => a.manager).filter(Boolean))].join(', ') || 'nenhum'}.
+
+Intenções possíveis:
+- "apontar": lançar horas trabalhadas. Sem projeto citado, projeto = null (vai para o projeto principal). Sem data, data = null (hoje). "modo": "somar" se disser "mais", "substituir" se pedir para corrigir o total, senão "perguntar".
+- "agenda_criar": reservar/registrar previsão de agenda para um gerente e/ou projeto num período, "tipo" "principal" ou "paralelo".
+- "agenda_ajustar": ajustar uma agenda já registrada (mudar projeto, período ou tipo).
+- "principal": definir qual é o projeto principal.
+- "valor": mudar o valor por hora (global, ou de um projeto).
+- "termino": informar a data de término prevista de um projeto.
+- "consulta": perguntar totais de horas ou valores.
+- "desconhecido": outra coisa.
+
+Responda só com um objeto JSON assim:
+{"intent":"apontar","horas":8,"data":"2026-11-20","modo":"perguntar","projeto":{"codigo":"GRSRJ-466","nome":"Oncologia Nova Iguaçu"},"gerente":null,"inicio":null,"fim":null,"tipo":null,"valor":null,"horas_dia":null}
+"horas_dia" = horas previstas por dia numa agenda, se dito (ex.: "10 horas por dia").
+Use null para o que não foi dito. Datas no formato AAAA-MM-DD. "codigo" é o identificador tipo LETRAS-NÚMERO, se houver.
+
+Comando: """${text.replace(/"""/g, '')}"""`;
+  try {
+    const r = await sample.json(prompt, {modelTier: 'quick'});
+    if (!r || typeof r !== 'object' || !r.intent || r.intent === 'desconhecido') return null;
+    const okD = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+    const pr = r.projeto && (r.projeto.codigo || r.projeto.nome) ? {code: r.projeto.codigo ? String(r.projeto.codigo).toUpperCase() : null, name: String(r.projeto.nome || r.projeto.codigo || '').trim()} : null;
+    const map = {
+      apontar: () => ({intent: 'apontar', hours: +r.horas || null, date: okD(r.data), mode: ['somar', 'substituir'].includes(r.modo) ? r.modo : 'perguntar', project: pr}),
+      agenda_criar: () => ({intent: 'agenda_criar', manager: r.gerente ? titleCase(String(r.gerente)) : null, project: pr, type: r.tipo === 'paralelo' ? 'paralelo' : r.tipo === 'principal' ? 'principal' : null, from: okD(r.inicio), to: okD(r.fim) || okD(r.inicio), hpd: +r.horas_dia || null}),
+      agenda_ajustar: () => ({intent: 'agenda_ajustar', manager: r.gerente ? titleCase(String(r.gerente)) : null, project: pr, type: r.tipo === 'paralelo' ? 'paralelo' : r.tipo === 'principal' ? 'principal' : null, from: okD(r.inicio), to: okD(r.fim) || okD(r.inicio), hpd: +r.horas_dia || null}),
+      principal: () => ({intent: 'principal', project: pr}),
+      valor: () => ({intent: 'valor', value: +r.valor || null, project: pr}),
+      termino: () => ({intent: 'termino', date: okD(r.fim) || okD(r.data), project: pr}),
+      consulta: () => ({intent: 'consulta'})
+    };
+    return map[r.intent] ? map[r.intent]() : null;
+  } catch (e) { return null; }
+}
+
+/* ============ execução ============ */
+function findProject(ref) {
+  if (!ref) return null;
+  if (ref.code) { const p = S.projects.find(p => p.code && p.code.toUpperCase() === ref.code.toUpperCase()); if (p) return p; }
+  const nm = strip(ref.name || '');
+  if (nm) {
+    let p = S.projects.find(p => strip(p.name) === nm || strip(pLabel(p)) === nm);
+    if (p) return p;
+    if (nm.length >= 3) {
+      p = S.projects.find(p => { const pn = strip(p.name); return pn.includes(nm) || (nm.includes(pn) && pn.length >= 3); });
+      if (p) return p;
+    }
+  }
+  return null;
+}
+function resolveProject(ref) {
+  const p = findProject(ref);
+  if (p) {
+    if (ref.code && !p.code) p.code = ref.code;
+    return {p, created: false};
+  }
+  const np = {id: uid(), code: ref.code || null, name: (ref.name || ref.code || 'Projeto').trim(), rate: null, start: null, end: null, manager: null, createdAt: Date.now()};
+  if (!ref.name && ref.code) np.name = ref.code, np.code = ref.code;
+  if (np.name === np.code) np.name = np.code;
+  S.projects.push(np);
+  return {p: np, created: true};
+}
+const noEndHint = p => {
+  const d = projDates(p);
+  return d.end ? '' : `\nAtenção: ${pLabel(p)} está sem previsão de término. Registre uma agenda para ele ou diga "término do projeto ${p.code || p.name} em 31/01".`;
+};
+
+// Retorna {text, kind:'ok'|'err'|'ask', actions:[{label, primary, run:()=>reply}], undoable}
+function execute(c) {
+  if (!c) return {kind: 'err', text: 'Não entendi o comando. Tente, por exemplo: "apontar 8 horas no projeto GRSRJ-466 Oncologia Nova Iguaçu" ou "registra previsão de agenda para Natalia de 10 a 31 de dezembro como projeto principal".'};
+  switch (c.intent) {
+    case 'desfazer': return undo() ? {kind: 'ok', text: 'Desfeito. Voltei ao estado anterior à última alteração.'} : {kind: 'err', text: 'Não há nada para desfazer nesta sessão.'};
+    case 'consulta': {
+      const t = todayISO(), ws = weekStart(t), ms = monthStart(t), st = monthStats(ms);
+      return {kind: 'ok', text: `Hoje: ${fmtH(dayTotal(t))}. Semana: ${fmtH(sumRange(ws, addDays(ws, 6)))}.\nMês: ${fmtH(st.tot.rh)} realizadas = ${money(st.tot.rv)}. Projetado até ${fmtD(st.me)}: ${money(st.tot.rv + st.tot.fv)}.`};
+    }
+    case 'apontar': return execApontar(c);
+    case 'agenda_criar': return execAgenda(c, false);
+    case 'agenda_ajustar': return execAgenda(c, true);
+    case 'principal': {
+      if (!c.project) return {kind: 'err', text: 'Qual projeto deve ser o principal? Diga, por exemplo: "definir projeto principal GRSRJ-466".'};
+      snapshot();
+      const {p, created} = resolveProject(c.project);
+      S.principalId = p.id;
+      return {kind: 'ok', undoable: true, text: `${pLabel(p)} agora é o projeto principal. "Apontar 8 horas" sem citar projeto vai para ele (quando não houver uma agenda principal com outro projeto no dia).` + (created ? '\nProjeto novo cadastrado.' : '')};
+    }
+    case 'valor': {
+      if (!c.value || c.value <= 0) return {kind: 'err', text: 'Não achei o valor. Diga, por exemplo: "valor hora 70" ou "valor hora do projeto Beira Leito 80".'};
+      snapshot();
+      if (c.project) {
+        const {p, created} = resolveProject(c.project); p.rate = c.value;
+        return {kind: 'ok', undoable: true, text: `Valor hora de ${pLabel(p)}: ${money(c.value)}. Os demais seguem com ${money(S.settings.rate)}.` + (created ? '\nProjeto novo cadastrado.' : '')};
+      }
+      S.settings.rate = c.value;
+      return {kind: 'ok', undoable: true, text: `Valor hora padrão agora é ${money(c.value)}. Projetos com valor próprio não mudam.`};
+    }
+    case 'termino': {
+      if (!c.project) return {kind: 'err', text: 'De qual projeto? Diga, por exemplo: "término do projeto GRSRJ-466 em 31/01".'};
+      if (!c.date) return {kind: 'err', text: 'Não achei a data de término. Diga, por exemplo: "término do projeto GRSRJ-466 em 31/01".'};
+      snapshot();
+      const {p, created} = resolveProject(c.project); p.end = c.date;
+      const d = projDates(p);
+      return {kind: 'ok', undoable: true, text: `Término previsto de ${pLabel(p)}: ${fmtDY(c.date)}.` + (d.src === 'agenda' ? `\nObservação: a agenda registrada indica ${fmtDY(d.end)} e tem prioridade sobre a data informada.` : '') + (created ? '\nProjeto novo cadastrado.' : '')};
+    }
+  }
+  return execute(null);
+}
+
+function execApontar(c, forced) {
+  if (c.dateInvalid) return {kind: 'err', text: 'Essa data não existe. Confira o dia e o mês.'};
+  const h = c.hours;
+  if (!h || h <= 0) return {kind: 'err', text: 'Não achei a quantidade de horas. Exemplo: "apontar 8 horas".'};
+  const date = c.date || todayISO();
+  if (date > todayISO()) return {kind: 'err', text: `${fmtDY(date)} ainda não chegou. Para reservar dias futuros, use a agenda: "registra previsão de agenda para Natalia de 10 a 31 de dezembro como projeto principal".`};
+  let p = forced && forced.projectId ? proj(forced.projectId) : null, created = false, viaPrincipal = false;
+  if (!p && c.project) { p = findProject(c.project); if (!p) created = true; }
+  if (!p && !c.project) {
+    p = principalFor(date); viaPrincipal = !!p;
+    if (!p) {
+      if (!S.projects.length) return {kind: 'err', text: 'Ainda não há projeto principal. Diga o projeto na primeira vez, por exemplo: "apontar 8 horas no projeto GRSRJ-466 Oncologia Nova Iguaçu".'};
+      const ag = agendasOn(date).find(a => a.type === 'principal');
+      return {kind: 'ask', text: (ag ? `A agenda principal de ${fmtDay(date)} é da ${ag.manager || 'reserva'} e ainda não tem projeto vinculado. ` : 'Não há projeto principal definido. ') + `Em qual projeto lanço ${fmtH(h)} de ${fmtDay(date)}?`,
+        actions: S.projects.slice(-6).reverse().map(pp => ({label: pLabel(pp), run: () => execApontar(c, {projectId: pp.id, mode: forced && forced.mode})}))};
+    }
+  }
+  const existing = p && !created ? hoursOn(p.id, date) : 0;
+  const mode = (forced && forced.mode) || c.mode;
+  if (existing > 0 && mode === 'perguntar') {
+    return {kind: 'ask', text: `${pLabel(p)} já tem ${fmtH(existing)} em ${fmtDay(date)}. O que você quer?`,
+      actions: [
+        {label: `Ficar com ${fmtH(h)} no total`, primary: true, run: () => execApontar(c, {projectId: p.id, mode: 'substituir'})},
+        {label: `Somar e ficar com ${fmtH(existing + h)}`, run: () => execApontar(c, {projectId: p.id, mode: 'somar'})},
+        {label: 'Cancelar', run: () => ({kind: 'ok', text: 'Cancelado. Nada foi alterado.'})}
+      ]};
+  }
+  snapshot();
+  if (!p) { const r = resolveProject(c.project); p = r.p; created = r.created; }
+  let newPrincipal = false;
+  if (!S.principalId || !proj(S.principalId)) { S.principalId = p.id; newPrincipal = true; }
+  if (mode === 'substituir') S.entries = S.entries.filter(e => !(e.projectId === p.id && e.date === date));
+  S.entries.push({id: uid(), projectId: p.id, date, hours: Math.round(h * 100) / 100, createdAt: Date.now()});
+  const total = hoursOn(p.id, date), day = dayTotal(date);
+  let text = `Pronto: ${fmtH(h)} em ${pLabel(p)}, ${fmtDay(date)}.`;
+  if (mode === 'somar' || mode === 'substituir' || existing) text += ` Total do projeto no dia: ${fmtH(total)}.`;
+  if (viaPrincipal) text += ' (projeto principal)';
+  if (created) text += '\nProjeto novo cadastrado.';
+  if (newPrincipal) text += ` Ele passou a ser seu projeto principal.`;
+  text += noEndHint(p);
+  return {kind: 'ok', undoable: true, text};
+}
+
+function execAgenda(c, adjust) {
+  if (c.rangeError) return {kind: 'err', text: 'Não consegui entender o período. Diga, por exemplo: "de 10 de dezembro até 31 de dezembro" ou "de 15 a 20/12".'};
+  if (!adjust) {
+    if (!c.from) return {kind: 'err', text: 'Faltou o período. Exemplo: "registra previsão de agenda para Natalia no período de 10 de dezembro até 31 de dezembro como projeto principal".'};
+    if (!c.manager && !c.project) return {kind: 'err', text: 'Para quem é a reserva? Diga o gerente, o projeto ou os dois.'};
+    snapshot();
+    let p = null, created = false;
+    if (c.project) { const r = resolveProject(c.project); p = r.p; created = r.created; }
+    const type = c.type || 'principal';
+    const a = {id: uid(), manager: c.manager || null, projectId: p ? p.id : null, from: c.from, to: c.to, type, hpd: c.hpd > 0 ? c.hpd : null, createdAt: Date.now()};
+    S.agendas.push(a);
+    let text = `Agenda registrada: ${agendaLine(a)}.`;
+    if (!c.type) text += ' Considerei como projeto principal porque o tipo não foi dito.';
+    if (!a.hpd) text += ` Para a previsão em R$ uso ${fmtH(type === 'principal' ? S.settings.hp : S.settings.hpar)} por dia útil; se for diferente, diga "ajuste a agenda de ${a.manager || 'Nome'} para 10 horas por dia".`;
+    if (created) text += '\nProjeto novo cadastrado.';
+    const clash = S.agendas.filter(x => x !== a && x.type === 'principal' && type === 'principal' && x.from <= a.to && x.to >= a.from);
+    if (clash.length) text += `\nVocê já tem outra agenda principal nesse período: ${clash.map(agendaLine).join('; ')}.`;
+    if (!p) text += `\nQuando souber o projeto, diga: "ajuste a agenda de ${fmtD(a.from)} a ${fmtD(a.to)} de ${a.manager} como projeto Nome".`;
+    return {kind: 'ok', undoable: true, text};
+  }
+  // ajuste
+  let cands = S.agendas.slice();
+  if (c.manager) { const mn = strip(c.manager); cands = cands.filter(a => a.manager && (strip(a.manager) === mn || strip(a.manager).split(' ')[0] === mn.split(' ')[0])); }
+  if (!c.manager && c.project) { const fp = findProject(c.project); if (fp) cands = cands.filter(a => a.projectId === fp.id); else cands = []; }
+  if (c.from && cands.length > 1) {
+    const ov = a => Math.max(0, (parseISO(a.to < c.to ? a.to : c.to) - parseISO(a.from > c.from ? a.from : c.from)) / 864e5 + 1);
+    const withOv = cands.filter(a => ov(a) > 0);
+    if (withOv.length) cands = withOv.sort((x, y) => ((y.from === c.from && y.to === c.to) - (x.from === c.from && x.to === c.to)) || (ov(y) - ov(x)) || ((y.createdAt || 0) - (x.createdAt || 0)));
+  }
+  if (!cands.length) {
+    if (c.manager && c.from) { const r = execAgenda({...c}, false); r.text = 'Não achei agenda anterior, então criei uma nova. ' + r.text; return r; }
+    return {kind: 'err', text: 'Não encontrei essa agenda. Confira o nome do gerente ou veja a aba Agenda.'};
+  }
+  if (!c.from && cands.length > 1) cands.sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0));
+  const a = cands[0];
+  snapshot();
+  const before = agendaLine(a);
+  let created = false;
+  if (c.project) { const r = resolveProject(c.project); a.projectId = r.p.id; created = r.created; }
+  if (c.from) { a.from = c.from; a.to = c.to; }
+  if (c.type) a.type = c.type;
+  if (c.hpd > 0) a.hpd = c.hpd;
+  if (c.manager && !a.manager) a.manager = c.manager;
+  let text = `Agenda ajustada.\nAntes: ${before}.\nAgora: ${agendaLine(a)}.`;
+  if (created) text += '\nProjeto novo cadastrado.';
+  return {kind: 'ok', undoable: true, text};
+}
+function agendaLine(a) {
+  const p = a.projectId ? proj(a.projectId) : null;
+  return [a.manager, p ? pLabel(p) : null].filter(Boolean).join(', ') + `, de ${fmtD(a.from)} a ${fmtDY(a.to)}, ${a.type === 'principal' ? 'projeto principal' : 'projeto paralelo'}` + (a.hpd ? `, ${fmtH(a.hpd)} por dia` : '');
+}
+
+/* ============ conversa ============ */
+const pending = new Map();
+async function runCommand(text, viaVoice) {
+  text = String(text || '').trim();
+  if (!text) return;
+  let c = parseCommand(text);
+  const entry = {id: uid(), at: Date.now(), q: text, a: '', kind: 'ok'};
+  S.log.push(entry);
+  if (!c && sample) { entry.a = 'Interpretando…'; entry.kind = 'wait'; renderLog(); c = await aiParse(text); }
+  applyReply(entry, execute(c), viaVoice);
+}
+function applyReply(entry, r, viaVoice) {
+  entry.a = r.text; entry.kind = r.kind; entry.undo = !!r.undoable;
+  if (r.actions && r.actions.length) pending.set(entry.id, r.actions); else pending.delete(entry.id);
+  persist(); render();
+  if (viaVoice && tts) tts.speak(r.text.split('\n')[0], {language: 'pt-BR'}).catch(() => {});
+}
+function renderLog() {
+  const el = $('#log');
+  const items = S.log.slice(-30).reverse();
+  $('#logCount').textContent = S.log.length ? S.log.length + (S.log.length === 1 ? ' comando' : ' comandos') : '';
+  if (!items.length) {
+    el.innerHTML = `<div class="empty"><b>Nenhum comando ainda</b>Escreva ou fale o que você trabalhou. Toque em um exemplo acima para testar.</div>`;
+    return;
+  }
+  const lastUndoId = [...S.log].reverse().find(x => x.undo)?.id;
+  el.innerHTML = items.map(x => {
+    const acts = pending.get(x.id);
+    const time = new Date(x.at).toLocaleString('pt-BR', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+    let btns = '';
+    if (acts) btns = acts.map((a, i) => `<button type="button" class="btn ${a.primary ? 'pri' : ''}" data-act="${esc(x.id)}" data-i="${i}">${esc(a.label)}</button>`).join('');
+    else if (x.undo && x.id === lastUndoId && undoStack.length) btns = `<button type="button" class="btn ghost" data-undo="${esc(x.id)}">Desfazer</button>`;
+    return `<div class="ex"><div class="q">${esc(x.q)}</div><div class="a ${x.kind === 'err' ? 'err' : ''}">${esc(x.a).replace(/\n/g, '<br>')}${btns ? `<div class="acts">${btns}</div>` : ''}</div><span class="when" style="align-self:flex-start">${esc(time)}</span></div>`;
+  }).join('');
+}
+$('#log').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.undo) { const x = S.log.find(l => l.id === b.dataset.undo); if (undo()) { if (x) x.undo = false; S.log.push({id: uid(), at: Date.now(), q: 'Desfazer', a: 'Desfeito. Voltei ao estado anterior.', kind: 'ok'}); persist(); render(); } return; }
+  const id = b.dataset.act; const acts = pending.get(id); if (!acts) return;
+  const x = S.log.find(l => l.id === id);
+  const act = acts[+b.dataset.i];
+  pending.delete(id);
+  const r = act.run();
+  if (x) { x.a = x.a + '\n→ ' + act.label; }
+  const entry = {id: uid(), at: Date.now(), q: act.label, a: '', kind: 'ok'};
+  S.log.push(entry);
+  applyReply(entry, r, false);
+});
+
+/* ============ telas ============ */
+let view = 'comandos', wk = weekStart(todayISO()), fm = monthStart(todayISO()), cm = monthStart(todayISO());
+function render() {
+  const t = todayISO();
+  $('#todayLabel').textContent = WD[dow(t)][0].toUpperCase() + WD[dow(t)].slice(1) + ', ' + parseISO(t).getDate() + ' de ' + MN[parseISO(t).getMonth()];
+  renderKpis(); renderLog(); renderExamples();
+  if (view === 'horas') renderWeek();
+  if (view === 'previsao') renderForecast();
+  if (view === 'projetos') renderProjects();
+  if (view === 'agenda') renderAgenda();
+}
+function renderKpis() {
+  const t = todayISO(), ws = weekStart(t), st = monthStats(monthStart(t));
+  $('#kpis').innerHTML = [
+    ['Hoje', fmtH(dayTotal(t)), ''],
+    ['Semana', fmtH(sumRange(ws, addDays(ws, 6))), `${fmtD(ws)} a ${fmtD(addDays(ws, 6))}`],
+    ['Mês realizado', money(st.tot.rv), fmtH(st.tot.rh), 'money'],
+    ['Mês projetado', money(st.tot.rv + st.tot.fv), 'com a agenda', 'money']
+  ].map(([l, v, s, c]) => `<div class="kpi ${c || ''}"><span class="eyebrow">${l}</span><b>${esc(v)}</b><small>${esc(s) || '&nbsp;'}</small></div>`).join('');
+}
+const EXAMPLES = [
+  'apontar 8 horas no projeto GRSRJ-466 Oncologia Nova Iguaçu',
+  'lançar 10 horas para ontem',
+  'Registra previsão de agenda para Natalia no período de 10 de dezembro até 31 de dezembro como projeto principal',
+  'Registre previsão de agenda para Marcos no período de 15 a 20 de dezembro como projeto paralelo com 3 horas por dia',
+  'ajuste a agenda de 10 a 25 de dezembro da Natalia como projeto Beira Leito',
+  'quantas horas eu tenho?'
+];
+function renderExamples() {
+  const el = $('#examples');
+  if (S.log.length > 8) { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = EXAMPLES.map((x, i) => `<button type="button" class="chip" data-ex="${i}">${esc(x)}</button>`).join('');
+}
+$('#examples').addEventListener('click', e => { const b = e.target.closest('[data-ex]'); if (!b) return; $('#cmd').value = EXAMPLES[+b.dataset.ex]; autoGrow(); $('#cmd').focus(); });
+
+function renderWeek() {
+  const days = [...Array(7)].map((_, i) => addDays(wk, i)), t = todayISO(), we = days[6];
+  $('#wLabel').textContent = `${fmtD(wk)} a ${fmtDY(we)}`;
+  const ids = [...new Set(S.entries.filter(e => e.date >= wk && e.date <= we).map(e => e.projectId))];
+  const pp = principalFor(t);
+  if (pp && !ids.includes(pp.id) && wk <= t && t <= we) ids.unshift(pp.id);
+  const total = sumRange(wk, we);
+  const val = valueRange(wk, we);
+  $('#weekTotalPill').textContent = `${fmtH(total)} · ${money(val)}`;
+  if (!ids.length) { $('#weekGrid').innerHTML = `<div class="empty"><b>Nenhuma hora nesta semana</b>Vá em Comandos e diga, por exemplo, "apontar 8 horas no projeto GRSRJ-466 Oncologia Nova Iguaçu".</div>`; return; }
+  let h = `<div class="table-wrap"><table class="grid"><thead><tr><th>Projeto</th>${days.map(d => `<th class="${d === t ? 'is-today' : ''}">${WD[dow(d)]}<br><span class="num">${fmtD(d)}</span></th>`).join('')}<th>Total</th></tr></thead><tbody>`;
+  for (const id of ids) {
+    const p = proj(id); if (!p) continue;
+    let rt = 0;
+    h += `<tr><td><span class="pname">${esc(p.name)}</span>${p.code ? `<span class="pcode">${esc(p.code)}</span>` : ''}</td>`;
+    for (const d of days) {
+      const v = hoursOn(id, d); rt += v;
+      h += `<td class="cell ${v ? 'has' : ''} ${isWeekday(d) ? '' : 'wknd'}"><button type="button" data-cell="${esc(id)}|${d}" aria-label="${esc(p.name)} ${fmtD(d)}">${v ? fmtH(v) : '·'}</button></td>`;
+    }
+    h += `<td class="tot num">${fmtH(rt)}</td></tr>`;
+  }
+  h += `</tbody><tfoot><tr><td>Total do dia</td>${days.map(d => `<td class="num">${dayTotal(d) ? fmtH(dayTotal(d)) : '–'}</td>`).join('')}<td class="num">${fmtH(total)}</td></tr></tfoot></table></div>`;
+  $('#weekGrid').innerHTML = h;
+}
+$('#weekGrid').addEventListener('click', e => { const b = e.target.closest('[data-cell]'); if (!b) return; const [id, d] = b.dataset.cell.split('|'); cellSheet(id, d); });
+$('#wPrev').onclick = () => { wk = addDays(wk, -7); renderWeek(); };
+$('#wNext').onclick = () => { wk = addDays(wk, 7); renderWeek(); };
+$('#wToday').onclick = () => { wk = weekStart(todayISO()); renderWeek(); };
+
+function renderForecast() {
+  $('#mLabel').textContent = monthLabel(fm);
+  const st = monthStats(fm), t = todayISO();
+  const past = st.me < t;
+  $('#fBoxes').innerHTML = `
+    <div class="fbox real"><span class="eyebrow">Realizado</span><b>${money(st.tot.rv)}</b><small class="num">${fmtH(st.tot.rh)} apontadas</small></div>
+    <div class="fbox proj"><span class="eyebrow">Projetado</span><b>${money(st.tot.rv + st.tot.fv)}</b><small class="num">${past ? 'mês encerrado' : `+ ${fmtH(st.tot.fh)} previstas na agenda`}</small></div>`;
+  $('#fRows').innerHTML = st.list.length ? st.list.map(r => `
+    <div class="row"><div style="min-width:0"><b style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.label)}</b><span class="small muted num">${fmtH(r.rh)} realizadas${r.fh ? ` · ${fmtH(r.fh)} previstas` : ''} · ${money(r.rate)}/h</span></div>
+    <div class="r"><b>${money(r.rv + r.fv)}</b><span class="small muted">${r.fv ? 'real ' + money(r.rv) : 'realizado'}</span></div></div>`).join('')
+    : `<div class="empty"><b>Sem horas neste mês</b>Os valores aparecem conforme você aponta horas e registra agendas.</div>`;
+  $('#fNote').textContent = `Realizado = horas apontadas no mês × valor hora (padrão ${money(S.settings.rate)}). Projetado = realizado + dias úteis restantes do mês (a partir de ${past ? '—' : fmtD(st.start)}) cobertos por agenda, usando as horas por dia de cada agenda. Quando a agenda não diz, uso a média padrão abaixo (${fmtH(S.settings.hp)} no principal, ${fmtH(S.settings.hpar)} no paralelo). Nada disso limita o apontamento: você lança quantas horas quiser.`;
+  $('#setRate').value = S.settings.rate; $('#setHp').value = S.settings.hp; $('#setHpar').value = S.settings.hpar;
+}
+for (const [id, key] of [['#setRate', 'rate'], ['#setHp', 'hp'], ['#setHpar', 'hpar']]) {
+  $(id).addEventListener('change', e => { const v = parseFloat(String(e.target.value).replace(',', '.')); if (isNaN(v) || v < 0) { renderForecast(); return; } S.settings[key] = v; persist(); renderForecast(); renderKpis(); toast('Salvo'); });
+}
+$('#mPrev').onclick = () => { fm = addMonths(fm, -1); renderForecast(); };
+$('#mNext').onclick = () => { fm = addMonths(fm, 1); renderForecast(); };
+$('#mToday').onclick = () => { fm = monthStart(todayISO()); renderForecast(); };
+
+function renderProjects() {
+  const t = todayISO();
+  const list = S.projects.map(p => ({p, d: projDates(p)})).sort((a, b) => (b.d.start || '').localeCompare(a.d.start || ''));
+  $('#projCount').textContent = list.length ? list.length + (list.length === 1 ? ' projeto' : ' projetos') : '';
+  if (!list.length) { $('#plist').innerHTML = `<div class="empty"><b>Nenhum projeto ainda</b>Os projetos são cadastrados sozinhos na primeira vez que você aponta horas ou registra uma agenda para eles.</div>`; return; }
+  $('#plist').innerHTML = list.map(({p, d}) => {
+    let st = ['run', 'Em andamento'];
+    if (d.start && d.start > t) st = ['fut', 'Previsto'];
+    if (d.end && d.end < t) st = ['done', 'Encerrado'];
+    let pct = 0;
+    if (d.start && d.end) { const tot = (parseISO(d.end) - parseISO(d.start)) || 1; pct = Math.max(0, Math.min(100, (parseISO(t) - parseISO(d.start)) / tot * 100)); }
+    const isP = S.principalId === p.id;
+    return `<button type="button" class="proj" data-proj="${esc(p.id)}">
+      <div class="proj-top"><div><b style="display:block">${esc(p.name)}</b>${p.code ? `<span class="small muted">${esc(p.code)}</span>` : ''}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${isP ? '<span class="pill pri">Principal</span>' : ''}<span class="pill ${st[0]}">${st[1]}</span></div></div>
+      <div class="meta"><span>Início <b class="num">${d.start ? fmtDY(d.start) : '—'}</b></span><span>Término <b class="num">${d.end ? fmtDY(d.end) : '—'}</b>${d.src === 'agenda' ? ' (agenda)' : d.src === 'manual' ? ' (informado)' : ''}</span><span>Horas <b class="num">${fmtH(d.hours)}</b></span><span>Valor <b class="num">${money(d.hours * rateOf(p))}</b></span>${d.mgrs.length ? `<span>Gerente <b>${esc(d.mgrs.join(', '))}</b></span>` : ''}</div>
+      <div class="bar ${d.end ? '' : 'open'}"><i style="width:${d.end ? pct : 100}%"></i></div>
+      ${d.end ? '' : '<span class="pill warn" style="align-self:flex-start">Sem previsão de término</span>'}
+    </button>`;
+  }).join('');
+}
+$('#plist').addEventListener('click', e => { const b = e.target.closest('[data-proj]'); if (b) projectSheet(b.dataset.proj); });
+
+function agendaItem(a) {
+  const p = a.projectId ? proj(a.projectId) : null;
+  const days = Math.round((parseISO(a.to) - parseISO(a.from)) / 864e5) + 1;
+  return `<div class="ag ${a.type}"><span class="sw"></span><div class="body">
+    <div class="t">${esc(a.manager || 'Sem gerente')}</div>
+    <div class="small">${p ? esc(pLabel(p)) : '<span class="muted">Sem projeto vinculado</span>'}</div>
+    <div class="small muted num">${fmtD(a.from)} a ${fmtDY(a.to)} · ${days} ${days === 1 ? 'dia' : 'dias'} · ${a.hpd ? fmtH(a.hpd) + '/dia' : 'média padrão ' + fmtH(a.type === 'principal' ? S.settings.hp : S.settings.hpar) + '/dia'}</div>
+    <div style="margin-top:6px"><span class="pill ${a.type === 'principal' ? 'pri' : 'par'}">${a.type === 'principal' ? 'Principal' : 'Paralelo'}</span></div>
+  </div><div class="acts"><button type="button" class="btn" data-ag-edit="${esc(a.id)}">Editar</button></div></div>`;
+}
+function renderAgenda() {
+  const t = todayISO();
+  const sorted = S.agendas.slice().sort((a, b) => a.from.localeCompare(b.from));
+  const now = sorted.filter(a => a.from <= t && a.to >= t), next = sorted.filter(a => a.from > t), past = sorted.filter(a => a.to < t).reverse();
+  $('#agNow').innerHTML = now.length ? now.map(agendaItem).join('') : `<div class="empty" style="padding:12px"><b>Nada reservado para hoje</b>Diga, por exemplo, "registra previsão de agenda para Natalia de 10 a 31 de dezembro como projeto principal".</div>`;
+  $('#agNext').innerHTML = next.length ? next.map(agendaItem).join('') : `<div class="empty" style="padding:12px">Nenhuma agenda futura registrada.</div>`;
+  $('#agPastCard').hidden = !past.length;
+  $('#agPast').innerHTML = past.slice(0, 20).map(agendaItem).join('');
+  // calendário
+  $('#cLabel').textContent = monthLabel(cm);
+  const first = parseISO(cm), me = monthEnd(cm);
+  const lead = (first.getDay() + 6) % 7;
+  let h = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'].map(x => `<div class="h">${x}</div>`).join('');
+  for (let i = 0; i < lead; i++) h += `<div class="d out"></div>`;
+  for (let d = cm; d <= me; d = addDays(d, 1)) {
+    const ags = agendasOn(d), hasP = ags.some(a => a.type === 'principal'), npar = ags.filter(a => a.type === 'paralelo').length;
+    const wkd = isWeekday(d);
+    let cls = !wkd ? 'wk' : hasP ? 'pri' : npar ? 'parx' : 'free';
+    if (d < t && wkd && !ags.length) cls = '';
+    const title = ags.map(agendaLine).join(' | ') || (wkd ? 'Livre' : 'Fim de semana');
+    h += `<div class="d ${cls} ${d === t ? 'today' : ''}" title="${esc(title)}"><span>${parseISO(d).getDate()}</span><span class="dots">${hasP && npar ? '<i></i>'.repeat(Math.min(npar, 3)) : ''}</span></div>`;
+  }
+  $('#cal').innerHTML = h;
+  // períodos livres
+  const free = []; let cur = null;
+  for (let i = 0, d = t; i < 56; i++, d = addDays(d, 1)) {
+    if (!isWeekday(d)) continue;
+    const busy = agendasOn(d).some(a => a.type === 'principal');
+    if (!busy) { if (cur) cur.to = d; else cur = {from: d, to: d, n: 0}; cur.n++; }
+    else if (cur) { free.push(cur); cur = null; }
+  }
+  if (cur) free.push(cur);
+  $('#freeList').innerHTML = free.length ? free.map(f => `<span class="num">${f.from === f.to ? fmtD(f.from) : fmtD(f.from) + ' a ' + fmtD(f.to)} · ${f.n} ${f.n === 1 ? 'dia' : 'dias'}</span>`).join('') : '<span class="muted small" style="border:0;padding:0">Sem dias livres de projeto principal nas próximas 8 semanas.</span>';
+}
+$('#cPrev').onclick = () => { cm = addMonths(cm, -1); renderAgenda(); };
+$('#cNext').onclick = () => { cm = addMonths(cm, 1); renderAgenda(); };
+document.addEventListener('click', e => { const b = e.target.closest('[data-ag-edit]'); if (b) agendaSheet(b.dataset.agEdit); });
+
+/* ============ folhas de edição ============ */
+function openSheet(html, onMount) {
+  const host = $('#sheetHost');
+  host.innerHTML = `<div class="sheet-bg"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`;
+  const bg = host.firstElementChild;
+  bg.addEventListener('click', e => { if (e.target === bg) closeSheet(); });
+  bg.querySelectorAll('[data-close]').forEach(b => b.onclick = closeSheet);
+  onMount && onMount(bg.querySelector('.sheet'));
+  const f = bg.querySelector('input,select'); f && setTimeout(() => f.focus(), 50);
+}
+function closeSheet() { $('#sheetHost').innerHTML = ''; }
+function armDelete(btn, fn) {
+  btn.onclick = () => {
+    if (btn.classList.contains('armed')) { fn(); return; }
+    btn.classList.add('armed'); const old = btn.textContent; btn.textContent = 'Toque de novo para excluir';
+    setTimeout(() => { btn.classList.remove('armed'); btn.textContent = old; }, 3500);
+  };
+}
+function cellSheet(pid, date) {
+  const p = proj(pid); if (!p) return;
+  const cur = hoursOn(pid, date);
+  openSheet(`<h3>${esc(pLabel(p))}</h3><div class="muted small">${esc(fmtDay(date))} · ${esc(fmtDY(date))}</div>
+    <div class="field"><label for="shH">Horas no dia</label><input id="shH" type="number" step="0.25" min="0" inputmode="decimal" value="${cur || ''}"></div>
+    <div class="acts"><button type="button" class="btn danger" id="shDel" ${cur ? '' : 'disabled'}>Apagar horas</button><button type="button" class="btn" data-close>Cancelar</button><button type="button" class="btn pri" id="shOk">Salvar</button></div>`, sh => {
+    sh.querySelector('#shOk').onclick = () => {
+      const v = parseFloat(String(sh.querySelector('#shH').value).replace(',', '.'));
+      if (isNaN(v) || v < 0) { toast('Informe um número de horas'); return; }
+      snapshot();
+      S.entries = S.entries.filter(e => !(e.projectId === pid && e.date === date));
+      if (v > 0) S.entries.push({id: uid(), projectId: pid, date, hours: v, createdAt: Date.now()});
+      persist(); closeSheet(); render(); toast('Horas atualizadas');
+    };
+    if (cur) armDelete(sh.querySelector('#shDel'), () => { snapshot(); S.entries = S.entries.filter(e => !(e.projectId === pid && e.date === date)); persist(); closeSheet(); render(); toast('Horas apagadas'); });
+  });
+}
+function projectSheet(pid) {
+  const p = proj(pid); if (!p) return;
+  const d = projDates(p);
+  openSheet(`<h3>Projeto</h3>
+    <div class="field"><label for="pCode">Código</label><input id="pCode" value="${esc(p.code || '')}" placeholder="GRSRJ-466"></div>
+    <div class="field"><label for="pName">Nome</label><input id="pName" value="${esc(p.name)}"></div>
+    <div class="field"><label for="pMgr">Gerente</label><input id="pMgr" value="${esc(p.manager || '')}" placeholder="Opcional"></div>
+    <div class="field"><label for="pRate">Valor hora próprio (R$)</label><input id="pRate" type="number" step="0.01" min="0" inputmode="decimal" value="${p.rate ?? ''}" placeholder="Padrão: ${esc(money(S.settings.rate))}"></div>
+    <div class="field"><label for="pStart">Início (opcional, senão vem do 1º apontamento ou da agenda)</label><input id="pStart" type="date" value="${esc(p.start || '')}"></div>
+    <div class="field"><label for="pEnd">Término informado ${d.src === 'agenda' ? '(a agenda indica ' + esc(fmtDY(d.end)) + ' e tem prioridade)' : ''}</label><input id="pEnd" type="date" value="${esc(p.end || '')}"></div>
+    <label class="check"><input type="checkbox" id="pPri" ${S.principalId === p.id ? 'checked' : ''}> Projeto principal</label>
+    <div class="acts"><button type="button" class="btn danger" id="pDel">Excluir projeto</button><button type="button" class="btn" data-close>Cancelar</button><button type="button" class="btn pri" id="pOk">Salvar</button></div>`, sh => {
+    sh.querySelector('#pOk').onclick = () => {
+      const name = sh.querySelector('#pName').value.trim(); if (!name) { toast('O nome não pode ficar vazio'); return; }
+      snapshot();
+      p.code = sh.querySelector('#pCode').value.trim().toUpperCase() || null;
+      p.name = name;
+      p.manager = sh.querySelector('#pMgr').value.trim() || null;
+      const r = parseFloat(String(sh.querySelector('#pRate').value).replace(',', '.'));
+      p.rate = isNaN(r) ? null : r;
+      p.start = sh.querySelector('#pStart').value || null;
+      p.end = sh.querySelector('#pEnd').value || null;
+      if (sh.querySelector('#pPri').checked) S.principalId = p.id; else if (S.principalId === p.id) S.principalId = null;
+      persist(); closeSheet(); render(); toast('Projeto salvo');
+    };
+    armDelete(sh.querySelector('#pDel'), () => {
+      snapshot();
+      S.projects = S.projects.filter(x => x.id !== pid);
+      S.entries = S.entries.filter(e => e.projectId !== pid);
+      S.agendas.forEach(a => { if (a.projectId === pid) a.projectId = null; });
+      if (S.principalId === pid) S.principalId = null;
+      persist(); closeSheet(); render(); toast('Projeto excluído. Use "desfazer" se foi sem querer.');
+    });
+  });
+}
+function agendaSheet(aid) {
+  const a = S.agendas.find(x => x.id === aid); if (!a) return;
+  const opts = `<option value="">Sem projeto</option>` + S.projects.map(p => `<option value="${esc(p.id)}" ${a.projectId === p.id ? 'selected' : ''}>${esc(pLabel(p))}</option>`).join('');
+  openSheet(`<h3>Agenda</h3>
+    <div class="field"><label for="aMgr">Gerente</label><input id="aMgr" value="${esc(a.manager || '')}"></div>
+    <div class="field"><label for="aProj">Projeto</label><select id="aProj">${opts}</select></div>
+    <div class="settings"><div class="field"><label for="aFrom">De</label><input id="aFrom" type="date" value="${esc(a.from)}"></div><div class="field"><label for="aTo">Até</label><input id="aTo" type="date" value="${esc(a.to)}"></div></div>
+    <div class="field"><label for="aType">Tipo</label><select id="aType"><option value="principal" ${a.type === 'principal' ? 'selected' : ''}>Projeto principal</option><option value="paralelo" ${a.type === 'paralelo' ? 'selected' : ''}>Projeto paralelo</option></select></div>
+    <div class="field"><label for="aHpd">Horas previstas por dia útil (opcional, só para a previsão em R$)</label><input id="aHpd" type="number" step="0.5" min="0" inputmode="decimal" value="${a.hpd ?? ''}" placeholder="Média padrão: ${esc(fmtH(a.type === 'principal' ? S.settings.hp : S.settings.hpar))}"></div>
+    <div class="acts"><button type="button" class="btn danger" id="aDel">Excluir</button><button type="button" class="btn" data-close>Cancelar</button><button type="button" class="btn pri" id="aOk">Salvar</button></div>`, sh => {
+    sh.querySelector('#aOk').onclick = () => {
+      const f = sh.querySelector('#aFrom').value, to = sh.querySelector('#aTo').value;
+      if (!f || !to) { toast('Preencha as duas datas'); return; }
+      snapshot();
+      a.manager = sh.querySelector('#aMgr').value.trim() || null;
+      a.projectId = sh.querySelector('#aProj').value || null;
+      a.from = f <= to ? f : to; a.to = f <= to ? to : f;
+      a.type = sh.querySelector('#aType').value;
+      const hv = parseFloat(String(sh.querySelector('#aHpd').value).replace(',', '.'));
+      a.hpd = hv > 0 ? hv : null;
+      persist(); closeSheet(); render(); toast('Agenda salva');
+    };
+    armDelete(sh.querySelector('#aDel'), () => { snapshot(); S.agendas = S.agendas.filter(x => x.id !== aid); persist(); closeSheet(); render(); toast('Agenda excluída'); });
+  });
+}
+
+/* ============ backup ============ */
+$('#bkCopy').onclick = () => {
+  const data = JSON.stringify({app: 'minhas-horas', ...S, log: []});
+  const fallback = () => openSheet(`<h3>Backup</h3><p class="small muted" style="margin:0">Selecione todo o texto abaixo e copie.</p><div class="field"><label for="bkTxt">Dados</label><textarea id="bkTxt" rows="8" style="border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--surface-2);width:100%" readonly></textarea></div><div class="acts"><button type="button" class="btn pri" data-close>Fechar</button></div>`, sh => { const ta = sh.querySelector('#bkTxt'); ta.value = data; setTimeout(() => ta.select(), 60); });
+  try { navigator.clipboard.writeText(data).then(() => toast('Backup copiado. Cole em "Restaurar backup" no outro lugar.'), fallback); } catch (e) { fallback(); }
+};
+$('#bkRestore').onclick = () => {
+  openSheet(`<h3>Restaurar backup</h3><p class="small muted" style="margin:0">Cole aqui o texto copiado em "Copiar backup". Os dados atuais deste aparelho serão substituídos.</p><div class="field"><label for="bkIn">Backup</label><textarea id="bkIn" rows="8" style="border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--surface-2);width:100%"></textarea></div><div class="acts"><button type="button" class="btn" data-close>Cancelar</button><button type="button" class="btn pri" id="bkGo">Restaurar</button></div>`, sh => {
+    sh.querySelector('#bkGo').onclick = () => {
+      let d; try { d = JSON.parse(sh.querySelector('#bkIn').value); } catch (e) { toast('Esse texto não é um backup válido'); return; }
+      if (!d || d.app !== 'minhas-horas') { toast('Esse texto não é um backup do Minhas Hora$$'); return; }
+      snapshot(); const log = S.log; delete d.app; S = migrate(d); S.log = log;
+      S.log.push({id: uid(), at: Date.now(), q: 'Restaurar backup', a: `Backup restaurado: ${S.projects.length} projetos, ${S.entries.length} apontamentos, ${S.agendas.length} agendas.`, kind: 'ok', undo: true});
+      persist(); closeSheet(); render(); toast('Backup restaurado');
+    };
+  });
+};
+
+/* ============ navegação ============ */
+const VIEWS = ['comandos', 'horas', 'previsao', 'projetos', 'agenda'];
+function go() {
+  const h = location.hash.replace('#', '');
+  view = VIEWS.includes(h) ? h : 'comandos';
+  for (const v of VIEWS) $('#v-' + v).hidden = v !== view;
+  document.querySelectorAll('nav.tabs a').forEach(a => { if (a.dataset.v === view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  render(); window.scrollTo(0, 0);
+}
+window.addEventListener('hashchange', go);
+
+/* ============ composer e voz ============ */
+const cmdEl = $('#cmd');
+function autoGrow() { cmdEl.style.height = 'auto'; cmdEl.style.height = Math.min(cmdEl.scrollHeight, 140) + 'px'; }
+cmdEl.addEventListener('input', autoGrow);
+cmdEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#cmdForm').requestSubmit(); } });
+let lastVoice = false;
+$('#cmdForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const v = cmdEl.value; if (!v.trim()) return;
+  cmdEl.value = ''; autoGrow();
+  const voice = lastVoice; lastVoice = false;
+  runCommand(v, voice);
+});
+
+let dict = null, tts = null, heard = '';
+function webSpeech() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return null;
+  let rec = null, st = 'idle';
+  const hp = [], hf = [], hs = [];
+  const emit = (arr, x) => arr.forEach(f => f(x));
+  const set = (s, reason) => { st = s; emit(hs, reason ? {state: s, reason} : {state: s}); };
+  return {
+    start() {
+      return new Promise((res, rej) => {
+        rec = new SR(); rec.lang = 'pt-BR'; rec.interimResults = true; rec.continuous = false;
+        rec.onstart = () => { set('listening'); res(); };
+        rec.onresult = e => {
+          let fin = '', int = '';
+          for (let i = e.resultIndex; i < e.results.length; i++) { const r = e.results[i]; if (r.isFinal) fin += r[0].transcript; else int += r[0].transcript; }
+          emit(hp, {text: int});
+          if (fin) emit(hf, {text: ' ' + fin.trim()});
+        };
+        rec.onerror = e => { if (st !== 'listening') rej({code: e.error === 'not-allowed' ? 'not_granted' : 'unavailable'}); };
+        rec.onend = () => { rec = null; set('idle', 'stopped'); };
+        set('starting');
+        try { rec.start(); } catch (err) { rec = null; set('idle', 'error'); rej({code: 'unavailable'}); }
+      });
+    },
+    stop() { if (rec) rec.stop(); return Promise.resolve(); },
+    active() { return st !== 'idle'; },
+    onPartial(f) { hp.push(f); }, onFinal(f) { hf.push(f); }, onState(f) { hs.push(f); }
+  };
+}
+function webTts() {
+  if (!('speechSynthesis' in window)) return null;
+  return {speak(text) { return new Promise(r => { const u = new SpeechSynthesisUtterance(text); u.lang = 'pt-BR'; u.onend = r; u.onerror = r; speechSynthesis.cancel(); speechSynthesis.speak(u); }); }};
+}
+function setupMic() {
+  const btn = $('#micBtn'), part = $('#partial');
+  if (!dict) { btn.hidden = true; $('#micHint').textContent = 'Para falar, use o microfone do teclado do celular e depois toque na seta.'; return; }
+  btn.hidden = false; $('#micHint').textContent = 'Toque no microfone, fale o comando e toque de novo para enviar.';
+  dict.onPartial(({text}) => { part.hidden = !text; part.textContent = text; });
+  dict.onFinal(({text}) => { heard += text; cmdEl.value = heard.replace(/^\s+/, ''); autoGrow(); });
+  dict.onState(({state, reason}) => {
+    const on = state !== 'idle';
+    btn.classList.toggle('live', on); btn.setAttribute('aria-label', on ? 'Parar e enviar' : 'Falar comando');
+    if (!on) {
+      part.hidden = true;
+      if (cmdEl.value.trim() && (reason === 'stopped' || reason === 'viewer_stopped' || reason === 'silence' || reason === 'ended' || !reason)) { lastVoice = true; $('#cmdForm').requestSubmit(); }
+    }
+  });
+  btn.addEventListener('click', () => {
+    if (dict.active()) { dict.stop().catch(() => {}); return; }
+    heard = cmdEl.value ? cmdEl.value + ' ' : '';
+    dict.start({language: 'pt-BR'}).catch(err => {
+      if (err && err.code === 'unavailable') return dict.start().catch(() => {});
+      if (err && err.code === 'not_granted') { btn.hidden = true; $('#micHint').textContent = 'Microfone não autorizado. Use o microfone do teclado do celular.'; }
+    });
+  });
+}
+
+/* ============ início ============ */
+go();
+autoGrow();
+(async () => {
+  const c = window.claude;
+  if (!c || typeof c.use !== 'function') {
+    setSync('local'); dict = webSpeech(); tts = webTts(); setupMic();
+    try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+    if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+    return;
+  }
+  setSync('wait');
+  const [db, user, d, t, smp] = await Promise.all(['db', 'user', 'dictation', 'tts', 'sample'].map(n => c.use(n).catch(() => null)));
+  dict = d; tts = t; sample = smp; setupMic();
+  if (!db || !user) { setSync('local'); return; }
+  let id = null; try { id = await user.id(); } catch (e) {}
+  if (!id) { setSync('local'); return; }
+  try {
+    const ref = db.doc('data/users/' + id + '/minhas-horas');
+    const snap = await Promise.race([ref.get(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))]);
+    dbRef = ref;
+    if (snap.exists) {
+      const remote = migrate(clone(snap.data()));
+      if ((remote.updatedAt || 0) >= (S.updatedAt || 0)) { S = remote; try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {} render(); setSync('ok'); }
+      else { dirty = true; flush(); }
+    } else if (hasData(S)) { dirty = true; flush(); }
+    else setSync('ok');
+  } catch (e) { setSync('err'); }
+})();
+
+// Exposto para testes
+
+})();
+</script>
+
+</body>
+</html>
