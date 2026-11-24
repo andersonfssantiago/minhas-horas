@@ -198,6 +198,7 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:560px;
 .pill.money{background:var(--money-soft);color:var(--money)}
 .meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted)}
 .meta b{color:var(--ink);font-weight:600}
+.proj.hist{opacity:.82}
 .bar{height:6px;border-radius:99px;background:var(--surface-2);border:1px solid var(--line);position:relative;overflow:hidden}
 .bar i{position:absolute;inset:0 auto 0 0;background:var(--accent);border-radius:99px}
 .bar.open i{background:repeating-linear-gradient(90deg,var(--warn) 0 6px,transparent 6px 10px)}
@@ -331,6 +332,10 @@ nav.tabs a[aria-current="page"]{color:var(--accent)}
     <div class="card">
       <div class="card-h"><h2>Projetos</h2><span class="small muted" id="projCount"></span></div>
       <div class="plist" id="plist"></div>
+    </div>
+    <div class="card" id="phistCard" hidden>
+      <div class="card-h"><h2>Histórico de projetos</h2><span class="small muted" id="phistCount"></span></div>
+      <div class="plist" id="phist"></div>
     </div>
   </section>
 
@@ -480,17 +485,22 @@ const sumRange = (a, b) => S.entries.filter(e => e.date >= a && e.date <= b).red
 const valueRange = (a, b) => S.entries.filter(e => e.date >= a && e.date <= b).reduce((s, e) => s + e.hours * rateOf(proj(e.projectId)), 0);
 const agendasOn = date => S.agendas.filter(a => a.from <= date && a.to >= date);
 function principalFor(date) {
-  const a = S.agendas.filter(a => a.type === 'principal' && a.projectId && proj(a.projectId) && a.from <= date && a.to >= date)
+  const open = p => p && !p.closedAt;
+  const a = S.agendas.filter(a => a.type === 'principal' && a.projectId && open(proj(a.projectId)) && a.from <= date && a.to >= date)
     .sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0))[0];
   if (a) return proj(a.projectId);
-  return proj(S.principalId) || (S.projects.length === 1 ? S.projects[0] : null);
+  const pp = proj(S.principalId);
+  if (open(pp)) return pp;
+  const act = S.projects.filter(p => !p.closedAt);
+  return act.length === 1 ? act[0] : null;
 }
 function projDates(p) {
   const es = S.entries.filter(e => e.projectId === p.id);
   const ags = S.agendas.filter(a => a.projectId === p.id);
   const starts = [p.start, ...es.map(e => e.date), ...ags.map(a => a.from)].filter(Boolean).sort();
   let end = null, src = null;
-  if (ags.length) { end = ags.map(a => a.to).sort().pop(); src = 'agenda'; }
+  if (p.closedAt) { end = p.closedAt; src = 'finalizado'; }
+  else if (ags.length) { end = ags.map(a => a.to).sort().pop(); src = 'agenda'; }
   else if (p.end) { end = p.end; src = 'manual'; }
   const hours = es.reduce((a, e) => a + e.hours, 0);
   const mgrs = [...new Set(ags.map(a => a.manager).filter(Boolean))];
@@ -514,6 +524,7 @@ function monthStats(ms) {
       const h = a.hpd > 0 ? a.hpd : (a.type === 'principal' ? S.settings.hp : S.settings.hpar);
       if (!h) continue;
       const p = a.projectId ? proj(a.projectId) : null;
+      if (p && p.closedAt && d > p.closedAt) continue;
       const key = p ? p.id : 'mgr:' + strip(a.manager || '');
       const r = row(key, p ? pLabel(p) : 'Agenda sem projeto' + (a.manager ? ' (' + a.manager + ')' : ''), '', rateOf(p));
       r.fh += h; r.fv += h * rateOf(p);
@@ -611,9 +622,27 @@ function adjustYear(d, mode) {
 }
 const DPART = '(?:o\\s+)?(?:dia\\s+)?(\\d{1,2})(?:\\s+de\\s+' + MRE + '|\\/(\\d{1,2}))?(?:\\s+de\\s+(\\d{4})|\\/(\\d{2,4}))?';
 const RANGE_RE = new RegExp('(?:\\b(?:no|para\\s+o|pelo|durante\\s+o|nesse|neste)\\s+)?(?:\\bperiodo\\s+)?(?:\\b(?:de|do|dos\\s+dias|entre|desde)\\s+)?\\b' + DPART + '\\s*(?:\\b(?:a|ate|e|ao)\\b|-)\\s*' + DPART);
-function parseRange(t) {
-  const m = t.take(RANGE_RE);
-  if (!m) return null;
+const MREN = MRE.replace('(', '(?:');
+const DTOK = '(?:hoje|amanha|depois\\s+de\\s+amanha|ontem|(?:o\\s+)?dia\\s+\\d{1,2}(?:\\s+de\\s+' + MREN + ')?(?:\\s+de\\s+\\d{4})?|\\d{1,2}\\/\\d{1,2}(?:\\/\\d{2,4})?|\\d{1,2}\\s+de\\s+' + MREN + '(?:\\s+de\\s+\\d{4})?|(?:proxima\\s+)?(?:segunda|terca|quarta|quinta|sexta|sabado|domingo)(?:[-\\s]feira)?)';
+const TOKRANGE_RE = new RegExp('(?:\\b(?:de|desde|a\\s+partir\\s+de|comecando(?:\\s+(?:em|no|na))?|com\\s+inicio\\s+(?:em|no|na)?|inicio\\s+(?:em|no|na)?|iniciando(?:\\s+(?:em|no|na))?)\\s+)?\\b(' + DTOK + ')\\s*,?\\s*(?:\\b(?:ate|a|ao|e\\s+terminando(?:\\s+(?:em|no|na))?|terminando(?:\\s+(?:em|no|na))?|com\\s+termino\\s+(?:em|no|na)?|termino\\s+(?:em|no|na)?|e\\s+termina(?:\\s+(?:em|no|na))?)\\b)\\s*(' + DTOK + ')');
+const UNTIL_RE = new RegExp('\\b(?:ate|terminando(?:\\s+(?:em|no|na))?|com\\s+termino\\s+(?:em|no|na)?|termino\\s+(?:em|no|na)?|termina(?:\\s+(?:em|no|na))?|previsao\\s+de\\s+termino\\s+(?:em|no|na|para)?)\\s*(' + DTOK + ')');
+function oneDate(str) { const tt = new Txt(str); const d = parseDate(tt, 'future'); return d || null; }
+function parseRange(t, opts) {
+  let m = t.take(RANGE_RE);
+  if (!m) {
+    const tm = t.take(TOKRANGE_RE);
+    if (tm) {
+      const from = oneDate(tm[1]); let to = oneDate(tm[2]);
+      if (!from || !to) return {error: true};
+      if (to < from && /^\s*(?:o\s+)?dia\s+\d{1,2}\s*$/.test(tm[2])) { const nm = addMonths(from, 1); to = mk(+nm.slice(0, 4), +nm.slice(5, 7), +tm[2].replace(/\D/g, '')) || to; }
+      return from <= to ? {from, to} : {from: to, to: from};
+    }
+    if (opts && opts.until) {
+      const um = t.take(UNTIL_RE);
+      if (um) { const to = oneDate(um[1]); if (!to) return {error: true}; const from = todayISO(); return {from: from <= to ? from : to, to: from <= to ? to : from}; }
+    }
+    return null;
+  }
   const now = todayISO(), cy = +now.slice(0, 4), cm = +now.slice(5, 7);
   const d1 = +m[1], mo1 = m[2] ? MONTHS[m[2]] : (m[3] ? +m[3] : null), y1 = yFix(+m[4] || +m[5]);
   const d2 = +m[6], mo2 = m[7] ? MONTHS[m[7]] : (m[8] ? +m[8] : null), y2 = yFix(+m[9] || +m[10]);
@@ -646,6 +675,7 @@ function parseCommand(input) {
   if (/\b(quantas horas|resumo|quanto (eu )?(ja )?(ganhei|tenho|faturei))\b/.test(n)) return {intent: 'consulta'};
 
   const isAgenda = /\b(agenda|reserv\w*|alocad\w*|alocacao|bloque\w*)\b/.test(n);
+  if (!isAgenda && /\b(cri\w*|cadastr\w*|abr\w*|adicion\w*|inclu\w*|registr\w*|inici\w*|comec\w*|nov[oa])\b[^.]*\bprojeto\b/.test(n) && !/\b\d+(?:[.,]\d+)?\s*(?:horas?|hrs?|h)\b(?!\s*(?:por|\/)\s*dia)/.test(n)) return parseNewProject(raw);
   if (isAgenda) {
     const adjust = /\b(ajust\w*|alter\w*|mud\w*|corrig\w*|atualiz\w*|troc\w*|edit\w*|vincul\w*)\b/.test(n);
     return parseAgenda(raw, adjust);
@@ -663,7 +693,16 @@ function parseCommand(input) {
     if (pm) ref = splitCode(pm.go(1));
     return {intent: 'valor', value: v ? parseFloat(v[1].replace(',', '.')) : null, project: ref};
   }
-  if (/\b(termino|termina|terminar|fim|encerr\w*|finaliz\w*)\b/.test(n) && /\bprojeto\b/.test(n) && !/\bhoras?\b/.test(n)) {
+  if (/\b(finaliz\w*|encerr\w*|conclu\w*|fech\w*|arquiv\w*|reabr\w*|reativ\w*)\b/.test(n) && /\bprojeto\b/.test(n) && !/\bhoras?\b/.test(n) && !/\b(previs\w*|previsto)\b/.test(n)) {
+    const reopen = /\b(reabr\w*|reativ\w*)\b/.test(n);
+    const t = new Txt(raw);
+    const d = reopen ? null : parseDate(t, 'past');
+    t.take(/^\s*(?:por\s+favor\s*,?\s*)?(?:pode\s+)?(?:finaliz|encerr|conclu|fech|arquiv|reabr|reativ)\w*\s+(?:(?:o|a)\s+)?(?:projeto\b)?/);
+    t.take(/\b(?:em|no\s+dia|dia|com\s+data\s+de)\s*$/);
+    const rest = t.rest().replace(/^(?:o|a)\s+(?:projeto\s+)?/i, '').replace(/^projeto\s+/i, '').replace(/["“”]/g, '').replace(/[\s,.;:!?]+$/g, '').trim();
+    return {intent: reopen ? 'reabrir' : 'finalizar', date: d || null, dateInvalid: d === null, project: rest ? splitCode(rest) : null};
+  }
+  if (/\b(termino|termina|terminar|fim)\b/.test(n) && /\bprojeto\b/.test(n) && !/\bhoras?\b/.test(n)) {
     const t = new Txt(raw);
     let d = parseDate(t, 'future');
     const r = d === undefined ? parseRange(t) : null;
@@ -690,6 +729,24 @@ function parseCommand(input) {
   return {intent: 'apontar', hours, date: date === undefined ? null : date, dateInvalid: date === null, mode, project: ref && (ref.code || ref.name) ? ref : null};
 }
 
+function parseNewProject(raw) {
+  const t = new Txt(raw);
+  let principal = false, m;
+  if ((m = t.take(/(?:\b(?:como|e)\s+)?(?:\bo\s+)?(?:\bprojeto\s+)?\bprincipal\b/))) principal = true;
+  const range = parseRange(t, {until: true});
+  let single;
+  if (!range) { const tt = t.take(new RegExp('\\b(?:a\\s+partir\\s+de|comecando(?:\\s+(?:em|no|na))?|com\\s+inicio\\s+(?:em|no|na)?|inicio\\s+(?:em|no|na)?|iniciando(?:\\s+(?:em|no|na))?|de|desde)\\s+(' + DTOK + ')')); if (tt) single = oneDate(tt[1]); }
+  let manager = null;
+  const mm = t.take(/\b(?:(?:do|da|com\s+(?:o|a)|para\s+(?:o|a))\s+gerente|gerente|gerid[oa]\s+por)\s+([a-z][a-z'\-]*(?:\s+(?!(?:no|na|em|de|do|da|como|para|entre|ate|a|e|o|com)\b)[a-z][a-z'\-]*){0,2})\s*$/d);
+  if (mm) manager = titleCase(mm.go(1));
+  t.take(/^\s*(?:por\s+favor\s*,?\s*)?(?:(?:cri|cadastr|abr|adicion|inclu|registr|inici|comec)\w*\s+)?(?:(?:o|um|uma|novo|nova)\s+)*(?:novo\s+)?projeto\b(?:\s+(?:chamado|com\s+o\s+nome(?:\s+de)?|de\s+nome|nomeado))?/);
+  let name = t.rest().replace(/["“”'‘’]/g, ' ').replace(/[\s,.;:!?-]+$/g, '').replace(/^\s*(?:o|a)\s+/i, '').replace(/\s+(?:com|e|de|do|da|no|na|para|como)\s*$/i, '').replace(/\s+/g, ' ').trim();
+  const ref = name ? splitCode(name) : null;
+  let from = null, to = null, rangeError = false;
+  if (range && range.error) rangeError = true; else if (range) { from = range.from; to = range.to; }
+  else if (single) from = single;
+  return {intent: 'criar_projeto', project: ref && (ref.code || ref.name) ? ref : null, from, to, manager, principal, rangeError};
+}
 function parseAgenda(raw, adjust) {
   const t = new Txt(raw);
   let type = null, m, hpd = null;
@@ -738,6 +795,9 @@ Intenções possíveis:
 - "principal": definir qual é o projeto principal.
 - "valor": mudar o valor por hora (global, ou de um projeto).
 - "termino": informar a data de término prevista de um projeto.
+- "finalizar": finalizar/encerrar um projeto (vai para o histórico). Use "data" se disser quando.
+- "reabrir": reabrir um projeto finalizado.
+- "criar_projeto": cadastrar um projeto novo, com "inicio" e "fim" se ditos (ex.: "criar projeto X de hoje até dia 27").
 - "consulta": perguntar totais de horas ou valores.
 - "desconhecido": outra coisa.
 
@@ -759,6 +819,9 @@ Comando: """${text.replace(/"""/g, '')}"""`;
       principal: () => ({intent: 'principal', project: pr}),
       valor: () => ({intent: 'valor', value: +r.valor || null, project: pr}),
       termino: () => ({intent: 'termino', date: okD(r.fim) || okD(r.data), project: pr}),
+      finalizar: () => ({intent: 'finalizar', date: okD(r.data), project: pr}),
+      reabrir: () => ({intent: 'reabrir', project: pr}),
+      criar_projeto: () => ({intent: 'criar_projeto', project: pr, from: okD(r.inicio), to: okD(r.fim), manager: r.gerente ? titleCase(String(r.gerente)) : null}),
       consulta: () => ({intent: 'consulta'})
     };
     return map[r.intent] ? map[r.intent]() : null;
@@ -826,6 +889,45 @@ function execute(c) {
       S.settings.rate = c.value;
       return {kind: 'ok', undoable: true, text: `Valor hora padrão agora é ${money(c.value)}. Projetos com valor próprio não mudam.`};
     }
+    case 'finalizar':
+    case 'reabrir': {
+      if (!c.project) return {kind: 'err', text: c.intent === 'finalizar' ? 'Qual projeto devo finalizar? Exemplo: "finalizar projeto Beira Leito".' : 'Qual projeto devo reabrir? Exemplo: "reabrir projeto Beira Leito".'};
+      const p = findProject(c.project);
+      if (!p) return {kind: 'err', text: `Não encontrei o projeto "${c.project.code || c.project.name}". Confira o nome na aba Projetos.`};
+      if (c.intent === 'reabrir') {
+        if (!p.closedAt) return {kind: 'ok', text: `${pLabel(p)} já está em andamento.`};
+        snapshot(); delete p.closedAt;
+        return {kind: 'ok', undoable: true, text: `${pLabel(p)} foi reaberto e voltou para os projetos em andamento.`};
+      }
+      if (c.dateInvalid) return {kind: 'err', text: 'Essa data não existe. Confira o dia e o mês.'};
+      if (p.closedAt) return {kind: 'ok', text: `${pLabel(p)} já está finalizado desde ${fmtDY(p.closedAt)}. Está no Histórico, na aba Projetos.`};
+      snapshot();
+      p.closedAt = c.date || todayISO();
+      let wasPrincipal = false;
+      if (S.principalId === p.id) { S.principalId = null; wasPrincipal = true; }
+      const d = projDates(p);
+      let text = `${pLabel(p)} foi finalizado em ${fmtDY(p.closedAt)}. Total: ${fmtH(d.hours)} (${money(d.hours * rateOf(p))}). Ele não foi excluído: está no Histórico, na aba Projetos.`;
+      if (wasPrincipal) text += '\nEle era o projeto principal. Para escolher outro, diga "definir projeto principal Nome".';
+      return {kind: 'ok', undoable: true, text};
+    }
+    case 'criar_projeto': {
+      if (!c.project || !(c.project.code || c.project.name)) return {kind: 'err', text: 'Qual é o nome do projeto? Exemplo: "criar projeto Beira Leito de hoje até dia 27".'};
+      if (c.rangeError) return {kind: 'err', text: 'Não consegui entender as datas. Exemplo: "criar projeto Beira Leito de hoje até dia 27" ou "de 01/12 a 20/12".'};
+      snapshot();
+      const {p, created} = resolveProject(c.project);
+      if (c.from) p.start = c.from;
+      if (c.to) p.end = c.to;
+      if (c.manager) p.manager = c.manager;
+      if (c.principal) S.principalId = p.id;
+      const d = projDates(p);
+      let text = (created ? 'Projeto criado: ' : 'Projeto atualizado: ') + pLabel(p) + '.';
+      if (c.from || c.to) text += `\nInício ${p.start ? fmtDY(p.start) : '—'}, término previsto ${p.end ? fmtDY(p.end) : '—'}.`;
+      if (c.manager) text += ` Gerente: ${c.manager}.`;
+      if (c.principal) text += '\nEle agora é o projeto principal.';
+      if (d.src === 'agenda' && c.to && d.end !== c.to) text += `\nObservação: a agenda deste projeto indica término em ${fmtDY(d.end)} e tem prioridade.`;
+      if (!c.to && !d.end) text += `\nEle está sem previsão de término. Diga, por exemplo, "término do projeto ${p.code || p.name} em 31/01".`;
+      return {kind: 'ok', undoable: true, text};
+    }
     case 'termino': {
       if (!c.project) return {kind: 'err', text: 'De qual projeto? Diga, por exemplo: "término do projeto GRSRJ-466 em 31/01".'};
       if (!c.date) return {kind: 'err', text: 'Não achei a data de término. Diga, por exemplo: "término do projeto GRSRJ-466 em 31/01".'};
@@ -852,16 +954,25 @@ function execApontar(c, forced) {
       if (!S.projects.length) return {kind: 'err', text: 'Ainda não há projeto principal. Diga o projeto na primeira vez, por exemplo: "apontar 8 horas no projeto GRSRJ-466 Oncologia Nova Iguaçu".'};
       const ag = agendasOn(date).find(a => a.type === 'principal');
       return {kind: 'ask', text: (ag ? `A agenda principal de ${fmtDay(date)} é da ${ag.manager || 'reserva'} e ainda não tem projeto vinculado. ` : 'Não há projeto principal definido. ') + `Em qual projeto lanço ${fmtH(h)} de ${fmtDay(date)}?`,
-        actions: S.projects.slice(-6).reverse().map(pp => ({label: pLabel(pp), run: () => execApontar(c, {projectId: pp.id, mode: forced && forced.mode})}))};
+        actions: S.projects.filter(pp => !pp.closedAt).slice(-6).reverse().map(pp => ({label: pLabel(pp), run: () => execApontar(c, {projectId: pp.id, mode: forced && forced.mode})}))};
     }
+  }
+  if (p && p.closedAt && !(forced && forced.closedOk)) {
+    const fw = (extra) => Object.assign({}, forced || {}, {projectId: p.id, closedOk: true}, extra);
+    return {kind: 'ask', text: `${pLabel(p)} está finalizado desde ${fmtDY(p.closedAt)}. Quer lançar ${fmtH(h)} mesmo assim?`,
+      actions: [
+        {label: 'Reabrir e lançar', primary: true, run: () => { snapshot(); delete p.closedAt; return execApontar(c, fw()); }},
+        {label: 'Lançar sem reabrir', run: () => execApontar(c, fw())},
+        {label: 'Cancelar', run: () => ({kind: 'ok', text: 'Cancelado. Nada foi alterado.'})}
+      ]};
   }
   const existing = p && !created ? hoursOn(p.id, date) : 0;
   const mode = (forced && forced.mode) || c.mode;
   if (existing > 0 && mode === 'perguntar') {
     return {kind: 'ask', text: `${pLabel(p)} já tem ${fmtH(existing)} em ${fmtDay(date)}. O que você quer?`,
       actions: [
-        {label: `Ficar com ${fmtH(h)} no total`, primary: true, run: () => execApontar(c, {projectId: p.id, mode: 'substituir'})},
-        {label: `Somar e ficar com ${fmtH(existing + h)}`, run: () => execApontar(c, {projectId: p.id, mode: 'somar'})},
+        {label: `Ficar com ${fmtH(h)} no total`, primary: true, run: () => execApontar(c, {projectId: p.id, mode: 'substituir', closedOk: true})},
+        {label: `Somar e ficar com ${fmtH(existing + h)}`, run: () => execApontar(c, {projectId: p.id, mode: 'somar', closedOk: true})},
         {label: 'Cancelar', run: () => ({kind: 'ok', text: 'Cancelado. Nada foi alterado.'})}
       ]};
   }
@@ -877,7 +988,6 @@ function execApontar(c, forced) {
   if (viaPrincipal) text += ' (projeto principal)';
   if (created) text += '\nProjeto novo cadastrado.';
   if (newPrincipal) text += ` Ele passou a ser seu projeto principal.`;
-  text += noEndHint(p);
   return {kind: 'ok', undoable: true, text};
 }
 
@@ -1006,6 +1116,8 @@ const EXAMPLES = [
   'Registra previsão de agenda para Natalia no período de 10 de dezembro até 31 de dezembro como projeto principal',
   'Registre previsão de agenda para Marcos no período de 15 a 20 de dezembro como projeto paralelo com 3 horas por dia',
   'ajuste a agenda de 10 a 25 de dezembro da Natalia como projeto Beira Leito',
+  'criar projeto Beira Leito de hoje até dia 27',
+  'finalizar projeto Beira Leito',
   'quantas horas eu tenho?'
 ];
 function renderExamples() {
@@ -1068,26 +1180,34 @@ $('#mToday').onclick = () => { fm = monthStart(todayISO()); renderForecast(); };
 
 function renderProjects() {
   const t = todayISO();
-  const list = S.projects.map(p => ({p, d: projDates(p)})).sort((a, b) => (b.d.start || '').localeCompare(a.d.start || ''));
-  $('#projCount').textContent = list.length ? list.length + (list.length === 1 ? ' projeto' : ' projetos') : '';
-  if (!list.length) { $('#plist').innerHTML = `<div class="empty"><b>Nenhum projeto ainda</b>Os projetos são cadastrados sozinhos na primeira vez que você aponta horas ou registra uma agenda para eles.</div>`; return; }
+  const all = S.projects.map(p => ({p, d: projDates(p)}));
+  const list = all.filter(x => !x.p.closedAt).sort((a, b) => (b.d.start || '').localeCompare(a.d.start || ''));
+  const hist = all.filter(x => x.p.closedAt).sort((a, b) => b.p.closedAt.localeCompare(a.p.closedAt));
+  $('#projCount').textContent = list.length ? list.length + (list.length === 1 ? ' em andamento' : ' em andamento') : '';
+  $('#phistCard').hidden = !hist.length;
+  $('#phistCount').textContent = hist.length ? hist.length + (hist.length === 1 ? ' finalizado' : ' finalizados') : '';
+  $('#phist').innerHTML = hist.map(({p, d}) => `<button type="button" class="proj hist" data-proj="${esc(p.id)}">
+      <div class="proj-top"><div><b style="display:block">${esc(p.name)}</b>${p.code ? `<span class="small muted">${esc(p.code)}</span>` : ''}</div><span class="pill done">Finalizado</span></div>
+      <div class="meta"><span>Início <b class="num">${d.start ? fmtDY(d.start) : '—'}</b></span><span>Finalizado <b class="num">${fmtDY(p.closedAt)}</b></span><span>Horas <b class="num">${fmtH(d.hours)}</b></span><span>Valor <b class="num">${money(d.hours * rateOf(p))}</b></span>${d.mgrs.length ? `<span>Gerente <b>${esc(d.mgrs.join(', '))}</b></span>` : ''}</div>
+    </button>`).join('');
+  if (!list.length) { $('#plist').innerHTML = hist.length ? `<div class="empty"><b>Nenhum projeto em andamento</b>Aponte horas num projeto novo e ele aparece aqui.</div>` : `<div class="empty"><b>Nenhum projeto ainda</b>Os projetos são cadastrados sozinhos na primeira vez que você aponta horas ou registra uma agenda para eles.</div>`; return; }
   $('#plist').innerHTML = list.map(({p, d}) => {
     let st = ['run', 'Em andamento'];
     if (d.start && d.start > t) st = ['fut', 'Previsto'];
-    if (d.end && d.end < t) st = ['done', 'Encerrado'];
     let pct = 0;
     if (d.start && d.end) { const tot = (parseISO(d.end) - parseISO(d.start)) || 1; pct = Math.max(0, Math.min(100, (parseISO(t) - parseISO(d.start)) / tot * 100)); }
     const isP = S.principalId === p.id;
     return `<button type="button" class="proj" data-proj="${esc(p.id)}">
       <div class="proj-top"><div><b style="display:block">${esc(p.name)}</b>${p.code ? `<span class="small muted">${esc(p.code)}</span>` : ''}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${isP ? '<span class="pill pri">Principal</span>' : ''}<span class="pill ${st[0]}">${st[1]}</span></div></div>
-      <div class="meta"><span>Início <b class="num">${d.start ? fmtDY(d.start) : '—'}</b></span><span>Término <b class="num">${d.end ? fmtDY(d.end) : '—'}</b>${d.src === 'agenda' ? ' (agenda)' : d.src === 'manual' ? ' (informado)' : ''}</span><span>Horas <b class="num">${fmtH(d.hours)}</b></span><span>Valor <b class="num">${money(d.hours * rateOf(p))}</b></span>${d.mgrs.length ? `<span>Gerente <b>${esc(d.mgrs.join(', '))}</b></span>` : ''}</div>
+      <div class="meta"><span>Início <b class="num">${d.start ? fmtDY(d.start) : '—'}</b></span><span>Término previsto <b class="num">${d.end ? fmtDY(d.end) : 'indefinido'}</b>${d.src === 'agenda' ? ' (agenda)' : d.src === 'manual' ? ' (informado)' : ''}</span><span>Horas <b class="num">${fmtH(d.hours)}</b></span><span>Valor <b class="num">${money(d.hours * rateOf(p))}</b></span>${d.mgrs.length ? `<span>Gerente <b>${esc(d.mgrs.join(', '))}</b></span>` : ''}</div>
       <div class="bar ${d.end ? '' : 'open'}"><i style="width:${d.end ? pct : 100}%"></i></div>
-      ${d.end ? '' : '<span class="pill warn" style="align-self:flex-start">Sem previsão de término</span>'}
+      ${d.end ? (d.end < t ? '<span class="pill warn" style="align-self:flex-start">Previsão de término já passou</span>' : '') : '<span class="pill done" style="align-self:flex-start">Em aberto até você finalizar</span>'}
     </button>`;
   }).join('');
 }
 $('#plist').addEventListener('click', e => { const b = e.target.closest('[data-proj]'); if (b) projectSheet(b.dataset.proj); });
+$('#phist').addEventListener('click', e => { const b = e.target.closest('[data-proj]'); if (b) projectSheet(b.dataset.proj); });
 
 function agendaItem(a) {
   const p = a.projectId ? proj(a.projectId) : null;
@@ -1183,7 +1303,7 @@ function projectSheet(pid) {
     <div class="field"><label for="pStart">Início (opcional, senão vem do 1º apontamento ou da agenda)</label><input id="pStart" type="date" value="${esc(p.start || '')}"></div>
     <div class="field"><label for="pEnd">Término informado ${d.src === 'agenda' ? '(a agenda indica ' + esc(fmtDY(d.end)) + ' e tem prioridade)' : ''}</label><input id="pEnd" type="date" value="${esc(p.end || '')}"></div>
     <label class="check"><input type="checkbox" id="pPri" ${S.principalId === p.id ? 'checked' : ''}> Projeto principal</label>
-    <div class="acts"><button type="button" class="btn danger" id="pDel">Excluir projeto</button><button type="button" class="btn" data-close>Cancelar</button><button type="button" class="btn pri" id="pOk">Salvar</button></div>`, sh => {
+    <div class="acts"><button type="button" class="btn danger" id="pDel">Excluir projeto</button><button type="button" class="btn" id="pClose">${p.closedAt ? 'Reabrir projeto' : 'Finalizar projeto'}</button><button type="button" class="btn" data-close>Cancelar</button><button type="button" class="btn pri" id="pOk">Salvar</button></div>`, sh => {
     sh.querySelector('#pOk').onclick = () => {
       const name = sh.querySelector('#pName').value.trim(); if (!name) { toast('O nome não pode ficar vazio'); return; }
       snapshot();
@@ -1196,6 +1316,12 @@ function projectSheet(pid) {
       p.end = sh.querySelector('#pEnd').value || null;
       if (sh.querySelector('#pPri').checked) S.principalId = p.id; else if (S.principalId === p.id) S.principalId = null;
       persist(); closeSheet(); render(); toast('Projeto salvo');
+    };
+    sh.querySelector('#pClose').onclick = () => {
+      snapshot();
+      if (p.closedAt) { delete p.closedAt; toast('Projeto reaberto'); }
+      else { p.closedAt = todayISO(); if (S.principalId === p.id) S.principalId = null; toast('Projeto finalizado e movido para o Histórico'); }
+      persist(); closeSheet(); render();
     };
     armDelete(sh.querySelector('#pDel'), () => {
       snapshot();
