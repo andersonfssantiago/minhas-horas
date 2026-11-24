@@ -295,6 +295,7 @@ nav.tabs a[aria-current="page"]{color:var(--accent)}
       </div>
       <div id="weekGrid"></div>
       <p class="hint">Toque em um dia para corrigir ou apagar as horas daquele projeto.</p>
+      <button type="button" class="btn pri" id="wSend" style="margin-top:12px;width:100%">Enviar resumo desta semana</button>
     </div>
   </section>
 
@@ -319,6 +320,12 @@ nav.tabs a[aria-current="page"]{color:var(--accent)}
         <div class="field"><label for="setHp">Média padrão/dia, principal</label><input id="setHp" type="number" step="0.5" min="0" inputmode="decimal"></div>
         <div class="field"><label for="setHpar">Média padrão/dia, paralelo</label><input id="setHpar" type="number" step="0.5" min="0" inputmode="decimal"></div>
       </div>
+    </div>
+    <div class="card" id="autoCard" hidden>
+      <div class="card-h"><h2>Envio automático por e-mail</h2><span class="small muted" id="autoStatus"></span></div>
+      <p class="small muted" style="margin:0 0 12px">Cole aqui o endereço da sua planilha Google de envio (o que termina em /exec). A cada alteração, o app manda uma cópia das horas para ela, e o Google envia o resumo no dia e horário combinados.</p>
+      <div class="field"><label for="autoUrl">Endereço da planilha de envio</label><input id="autoUrl" type="url" inputmode="url" placeholder="https://script.google.com/macros/s/.../exec"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" class="btn" id="autoSave">Salvar endereço</button><button type="button" class="btn" id="autoSync">Enviar dados agora</button></div>
     </div>
     <div class="card">
       <div class="card-h"><h2>Backup dos dados</h2></div>
@@ -458,6 +465,26 @@ function persist() {
   if (S.log.length > 60) S.log = S.log.slice(-60);
   try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {}
   dirty = true; clearTimeout(saveTimer); saveTimer = setTimeout(flush, 600);
+  clearTimeout(cloudTimer); cloudTimer = setTimeout(pushCloud, 2500);
+}
+/* Cópia para a planilha Google de envio automático (só no app instalado) */
+let cloudTimer = null;
+function pushCloud(manual) {
+  const url = S.settings.autoUrl;
+  if (!url || !/^https:\/\/script\.google(?:usercontent)?\.com\//.test(url)) return Promise.resolve(false);
+  const payload = {
+    app: 'minhas-horas', sentAt: new Date().toISOString(),
+    projects: S.projects.map(p => ({id: p.id, code: p.code || '', name: p.name})),
+    entries: S.entries.map(e => ({date: e.date, projectId: e.projectId, hours: e.hours}))
+  };
+  return fetch(url, {method: 'POST', mode: 'no-cors', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify(payload)})
+    .then(() => { S.settings.autoLast = Date.now(); try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {} renderAuto(); if (manual) toast('Dados enviados para a planilha'); return true; })
+    .catch(() => { if (manual) toast('Não consegui enviar. Confira a internet e o endereço.'); return false; });
+}
+function renderAuto() {
+  const el = $('#autoStatus'); if (!el) return;
+  const inp = $('#autoUrl'); if (inp && document.activeElement !== inp) inp.value = S.settings.autoUrl || '';
+  el.textContent = S.settings.autoUrl ? (S.settings.autoLast ? 'Última cópia: ' + new Date(S.settings.autoLast).toLocaleString('pt-BR', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'}) : 'Configurado') : 'Desligado';
 }
 async function flush() {
   if (!dbRef || saving || !dirty) return;
@@ -672,6 +699,10 @@ function parseCommand(input) {
   const n = strip(raw);
 
   if (/^(desfaz|desfazer|desfaca|desfaça|voltar)\b/.test(n)) return {intent: 'desfazer'};
+  if (/\b(envi\w*|mand\w*|compartilh\w*|ger[ae]\w*|mont\w*|prepar\w*)\b.*\bresumo\b|\bresumo\s+(?:das\s+horas\s+)?da\s+semana\b|\bresumo\s+semanal\b/.test(n)) {
+    const prev = /\b(passada|anterior|ultima)\b/.test(n);
+    return {intent: 'resumo_semana', week: prev ? addDays(weekStart(todayISO()), -7) : weekStart(todayISO())};
+  }
   if (/\b(quantas horas|resumo|quanto (eu )?(ja )?(ganhei|tenho|faturei))\b/.test(n)) return {intent: 'consulta'};
 
   const isAgenda = /\b(agenda|reserv\w*|alocad\w*|alocacao|bloque\w*)\b/.test(n);
@@ -798,6 +829,7 @@ Intenções possíveis:
 - "finalizar": finalizar/encerrar um projeto (vai para o histórico). Use "data" se disser quando.
 - "reabrir": reabrir um projeto finalizado.
 - "criar_projeto": cadastrar um projeto novo, com "inicio" e "fim" se ditos (ex.: "criar projeto X de hoje até dia 27").
+- "resumo_semana": enviar/montar o resumo das horas da semana (use "data" = algum dia da semana pedida; semana passada se disser).
 - "consulta": perguntar totais de horas ou valores.
 - "desconhecido": outra coisa.
 
@@ -822,6 +854,7 @@ Comando: """${text.replace(/"""/g, '')}"""`;
       finalizar: () => ({intent: 'finalizar', date: okD(r.data), project: pr}),
       reabrir: () => ({intent: 'reabrir', project: pr}),
       criar_projeto: () => ({intent: 'criar_projeto', project: pr, from: okD(r.inicio), to: okD(r.fim), manager: r.gerente ? titleCase(String(r.gerente)) : null}),
+      resumo_semana: () => ({intent: 'resumo_semana', week: weekStart(okD(r.data) || todayISO())}),
       consulta: () => ({intent: 'consulta'})
     };
     return map[r.intent] ? map[r.intent]() : null;
@@ -865,6 +898,12 @@ function execute(c) {
   if (!c) return {kind: 'err', text: 'Não entendi o comando. Tente, por exemplo: "apontar 8 horas no projeto GRSRJ-466 Oncologia Nova Iguaçu" ou "registra previsão de agenda para Natalia de 10 a 31 de dezembro como projeto principal".'};
   switch (c.intent) {
     case 'desfazer': return undo() ? {kind: 'ok', text: 'Desfeito. Voltei ao estado anterior à última alteração.'} : {kind: 'err', text: 'Não há nada para desfazer nesta sessão.'};
+    case 'resumo_semana': {
+      const ws = c.week || weekStart(todayISO());
+      const txt = weekSummary(ws, false);
+      if (!sumRange(ws, addDays(ws, 6))) return {kind: 'err', text: `Não há horas apontadas na semana de ${fmtD(ws)} a ${fmtDY(addDays(ws, 6))}.`};
+      return {kind: 'ask', text: txt, actions: [{label: 'Enviar por WhatsApp ou e-mail', primary: true, run: () => { setTimeout(() => sendSheet(ws), 50); return {kind: 'ok', text: 'Abri as opções de envio.'}; }}]};
+    }
     case 'consulta': {
       const t = todayISO(), ws = weekStart(t), ms = monthStart(t), st = monthStats(ms);
       return {kind: 'ok', text: `Hoje: ${fmtH(dayTotal(t))}. Semana: ${fmtH(sumRange(ws, addDays(ws, 6)))}.\nMês: ${fmtH(st.tot.rh)} realizadas = ${money(st.tot.rv)}. Projetado até ${fmtD(st.me)}: ${money(st.tot.rv + st.tot.fv)}.`};
@@ -1118,6 +1157,7 @@ const EXAMPLES = [
   'ajuste a agenda de 10 a 25 de dezembro da Natalia como projeto Beira Leito',
   'criar projeto Beira Leito de hoje até dia 27',
   'finalizar projeto Beira Leito',
+  'enviar resumo da semana',
   'quantas horas eu tenho?'
 ];
 function renderExamples() {
@@ -1169,6 +1209,7 @@ function renderForecast() {
     <div class="r"><b>${money(r.rv + r.fv)}</b><span class="small muted">${r.fv ? 'real ' + money(r.rv) : 'realizado'}</span></div></div>`).join('')
     : `<div class="empty"><b>Sem horas neste mês</b>Os valores aparecem conforme você aponta horas e registra agendas.</div>`;
   $('#fNote').textContent = `Realizado = horas apontadas no mês × valor hora (padrão ${money(S.settings.rate)}). Projetado = realizado + dias úteis restantes do mês (a partir de ${past ? '—' : fmtD(st.start)}) cobertos por agenda, usando as horas por dia de cada agenda. Quando a agenda não diz, uso a média padrão abaixo (${fmtH(S.settings.hp)} no principal, ${fmtH(S.settings.hpar)} no paralelo). Nada disso limita o apontamento: você lança quantas horas quiser.`;
+  renderAuto();
   $('#setRate').value = S.settings.rate; $('#setHp').value = S.settings.hp; $('#setHpar').value = S.settings.hpar;
 }
 for (const [id, key] of [['#setRate', 'rate'], ['#setHp', 'hp'], ['#setHpar', 'hpar']]) {
@@ -1275,6 +1316,55 @@ function armDelete(btn, fn) {
     setTimeout(() => { btn.classList.remove('armed'); btn.textContent = old; }, 3500);
   };
 }
+/* ============ resumo semanal ============ */
+function weekSummary(ws, withMoney) {
+  const we = addDays(ws, 6);
+  const es = S.entries.filter(e => e.date >= ws && e.date <= we);
+  const byP = new Map();
+  for (const e of es) { if (!byP.has(e.projectId)) byP.set(e.projectId, []); byP.get(e.projectId).push(e); }
+  const lines = [`Horas da semana · ${fmtD(ws)} a ${fmtDY(we)}`, ''];
+  let tot = 0, val = 0;
+  const rows = [...byP.entries()].map(([pid, list]) => ({p: proj(pid), list, h: list.reduce((a, e) => a + e.hours, 0)})).sort((a, b) => b.h - a.h);
+  for (const r of rows) {
+    const v = r.h * rateOf(r.p); tot += r.h; val += v;
+    lines.push(`${pLabel(r.p)}: ${fmtH(r.h)}${withMoney ? ' · ' + money(v) : ''}`);
+    const days = [...new Set(r.list.map(e => e.date))].sort();
+    lines.push('   ' + days.map(d => `${WD[dow(d)]} ${fmtD(d)}: ${fmtH(hoursOn(r.p ? r.p.id : null, d))}`).join(' | '));
+  }
+  lines.push('', `Total da semana: ${fmtH(tot)}${withMoney ? ' · ' + money(val) : ''}`);
+  return lines.join('\n');
+}
+function sendSheet(ws) {
+  const canShare = !window.claude && navigator.share;
+  openSheet(`<h3>Enviar resumo da semana</h3>
+    <div class="muted small">${esc(fmtD(ws))} a ${esc(fmtDY(addDays(ws, 6)))}. Você pode editar o texto antes de enviar.</div>
+    <div class="field"><label for="sTxt">Texto</label><textarea id="sTxt" rows="10" style="border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--surface-2);width:100%;font-size:13.5px"></textarea></div>
+    <div class="acts" style="justify-content:stretch">
+      <a class="btn pri" id="sWa" target="_blank" rel="noopener" style="flex:1;text-align:center;text-decoration:none">WhatsApp</a>
+      <a class="btn" id="sMail" style="flex:1;text-align:center;text-decoration:none;color:inherit">E-mail</a>
+      ${canShare ? '<button type="button" class="btn" id="sShare" style="flex:1">Mais opções</button>' : ''}
+      <button type="button" class="btn" id="sCopy" style="flex:1">Copiar</button>
+    </div>
+    <div class="acts"><button type="button" class="btn ghost" data-close>Fechar</button></div>`, sh => {
+    const ta = sh.querySelector('#sTxt');
+    const sync = () => {
+      sh.querySelector('#sWa').href = 'https://wa.me/?text=' + encodeURIComponent(ta.value);
+      sh.querySelector('#sMail').href = 'mailto:?subject=' + encodeURIComponent(`Horas da semana ${fmtD(ws)} a ${fmtDY(addDays(ws, 6))}`) + '&body=' + encodeURIComponent(ta.value);
+    };
+    ta.value = weekSummary(ws, false); sync();
+    ta.addEventListener('input', sync);
+    const sb = sh.querySelector('#sShare');
+    if (sb) sb.onclick = () => { navigator.share({title: 'Horas da semana', text: ta.value}).catch(() => {}); };
+    sh.querySelector('#sCopy').onclick = () => {
+      const fb = () => { ta.focus(); ta.select(); toast('Texto selecionado. Copie com o menu do aparelho.'); };
+      try { navigator.clipboard.writeText(ta.value).then(() => toast('Resumo copiado'), fb); } catch (e) { fb(); }
+    };
+  });
+}
+$('#wSend').onclick = () => {
+  if (!sumRange(wk, addDays(wk, 6))) { toast('Não há horas apontadas nesta semana'); return; }
+  sendSheet(wk);
+};
 function cellSheet(pid, date) {
   const p = proj(pid); if (!p) return;
   const cur = hoursOn(pid, date);
@@ -1360,6 +1450,13 @@ function agendaSheet(aid) {
 }
 
 /* ============ backup ============ */
+$('#autoSave').onclick = () => {
+  const v = $('#autoUrl').value.trim();
+  if (v && !/^https:\/\/script\.google(?:usercontent)?\.com\//.test(v)) { toast('Esse endereço não é de uma planilha Google de envio'); return; }
+  S.settings.autoUrl = v || null; persist(); renderAuto();
+  if (v) pushCloud(true); else toast('Envio automático desligado');
+};
+$('#autoSync').onclick = () => { if (!S.settings.autoUrl) { toast('Cole e salve o endereço primeiro'); return; } pushCloud(true); };
 $('#bkCopy').onclick = () => {
   const data = JSON.stringify({app: 'minhas-horas', ...S, log: []});
   const fallback = () => openSheet(`<h3>Backup</h3><p class="small muted" style="margin:0">Selecione todo o texto abaixo e copie.</p><div class="field"><label for="bkTxt">Dados</label><textarea id="bkTxt" rows="8" style="border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--surface-2);width:100%" readonly></textarea></div><div class="acts"><button type="button" class="btn pri" data-close>Fechar</button></div>`, sh => { const ta = sh.querySelector('#bkTxt'); ta.value = data; setTimeout(() => ta.select(), 60); });
@@ -1380,7 +1477,12 @@ $('#bkRestore').onclick = () => {
 /* ============ navegação ============ */
 const VIEWS = ['comandos', 'horas', 'previsao', 'projetos', 'agenda'];
 function go() {
-  const h = location.hash.replace('#', '');
+  let h = location.hash.replace('#', '');
+  if (h === 'enviar-resumo') {
+    // Atalho para abrir direto o envio do resumo (ex.: automação do app Atalhos do iPhone)
+    h = 'horas'; wk = weekStart(todayISO());
+    setTimeout(() => { if (sumRange(wk, addDays(wk, 6))) sendSheet(wk); else toast('Não há horas apontadas nesta semana'); }, 120);
+  }
   view = VIEWS.includes(h) ? h : 'comandos';
   for (const v of VIEWS) $('#v-' + v).hidden = v !== view;
   document.querySelectorAll('nav.tabs a').forEach(a => { if (a.dataset.v === view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
@@ -1527,7 +1629,7 @@ autoGrow();
 (async () => {
   const c = window.claude;
   if (!c || typeof c.use !== 'function') {
-    setSync('local'); dict = webSpeech(); tts = webTts(); setupMic();
+    setSync('local'); dict = webSpeech(); tts = webTts(); setupMic(); $('#autoCard').hidden = false;
     try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
     if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
     return;
