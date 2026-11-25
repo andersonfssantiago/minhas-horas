@@ -83,6 +83,9 @@ section.view{display:flex;flex-direction:column;gap:14px}
 .eyebrow{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 
 /* KPIs */
+.due{font-size:13px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.due:empty{display:none}
+.due.late{border-color:var(--warn);background:var(--warn-soft);color:var(--ink)}
 .kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0}
 .kpi b{display:block;font-family:var(--f-display);font-size:21px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -260,6 +263,7 @@ nav.tabs a[aria-current="page"]{color:var(--accent)}
   <!-- COMANDOS -->
   <section class="view" id="v-comandos">
     <div class="kpis" id="kpis"></div>
+    <div class="due" id="dueLine"></div>
     <div class="card">
       <form class="composer" id="cmdForm" autocomplete="off">
         <textarea id="cmd" rows="1" placeholder="Ex.: apontar 8 horas no projeto GRSRJ-466 Oncologia Nova Iguaçu" aria-label="Comando"></textarea>
@@ -295,7 +299,7 @@ nav.tabs a[aria-current="page"]{color:var(--accent)}
       </div>
       <div id="weekGrid"></div>
       <p class="hint">Toque em um dia para corrigir ou apagar as horas daquele projeto.</p>
-      <button type="button" class="btn pri" id="wSend" style="margin-top:12px;width:100%">Enviar resumo desta semana</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button type="button" class="btn pri" id="pSend" style="flex:1">Enviar horas do período</button><button type="button" class="btn" id="wSend" style="flex:1">Enviar resumo desta semana</button></div>
     </div>
   </section>
 
@@ -321,11 +325,10 @@ nav.tabs a[aria-current="page"]{color:var(--accent)}
         <div class="field"><label for="setHpar">Média padrão/dia, paralelo</label><input id="setHpar" type="number" step="0.5" min="0" inputmode="decimal"></div>
       </div>
     </div>
-    <div class="card" id="autoCard" hidden>
-      <div class="card-h"><h2>Envio automático por e-mail</h2><span class="small muted" id="autoStatus"></span></div>
-      <p class="small muted" style="margin:0 0 12px">Cole aqui o endereço da sua planilha Google de envio (o que termina em /exec). A cada alteração, o app manda uma cópia das horas para ela, e o Google envia o resumo no dia e horário combinados.</p>
-      <div class="field"><label for="autoUrl">Endereço da planilha de envio</label><input id="autoUrl" type="url" inputmode="url" placeholder="https://script.google.com/macros/s/.../exec"></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" class="btn" id="autoSave">Salvar endereço</button><button type="button" class="btn" id="autoSync">Enviar dados agora</button></div>
+    <div class="card">
+      <div class="card-h"><h2>Envio das horas</h2></div>
+      <p class="small muted" style="margin:0 0 12px">Dias 10, 20 e 30 (em fevereiro, o último dia), ao meio-dia. Em feriado nacional ou fim de semana, vale o dia útil anterior. O dia 31 entra no período seguinte.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" class="btn" id="setAlerts">Criar alertas no iPhone</button></div>
     </div>
     <div class="card">
       <div class="card-h"><h2>Backup dos dados</h2></div>
@@ -465,7 +468,6 @@ function persist() {
   if (S.log.length > 60) S.log = S.log.slice(-60);
   try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {}
   dirty = true; clearTimeout(saveTimer); saveTimer = setTimeout(flush, 600);
-  clearTimeout(cloudTimer); cloudTimer = setTimeout(pushCloud, 2500);
 }
 /* Cópia para a planilha Google de envio automático (só no app instalado) */
 let cloudTimer = null;
@@ -699,6 +701,9 @@ function parseCommand(input) {
   const n = strip(raw);
 
   if (/^(desfaz|desfazer|desfaca|desfaça|voltar)\b/.test(n)) return {intent: 'desfazer'};
+  if (/\b(cri\w*|ativ\w*|coloc\w*|configur\w*)\b.*\b(alertas?|lembretes?|avisos?)\b/.test(n)) return {intent: 'alertas'};
+  if (/\b(ja\s+)?(enviei|mandei)\b.*\bhoras\b|\bmarc\w*\b.*\b(como\s+)?enviad[ao]s?\b/.test(n)) return {intent: 'marcar_enviado'};
+  if (!/\bsemana\b/.test(n) && (/\b(envi\w*|mand\w*|compartilh\w*)\s+(?:as\s+)?(?:minhas\s+)?horas\b/.test(n) || /\bresumo\s+(?:do|da)\s+(periodo|quinzena|decendio|mes)\b/.test(n))) return {intent: 'resumo_periodo'};
   if (/\b(envi\w*|mand\w*|compartilh\w*|ger[ae]\w*|mont\w*|prepar\w*)\b.*\bresumo\b|\bresumo\s+(?:das\s+horas\s+)?da\s+semana\b|\bresumo\s+semanal\b/.test(n)) {
     const prev = /\b(passada|anterior|ultima)\b/.test(n);
     return {intent: 'resumo_semana', week: prev ? addDays(weekStart(todayISO()), -7) : weekStart(todayISO())};
@@ -829,6 +834,9 @@ Intenções possíveis:
 - "finalizar": finalizar/encerrar um projeto (vai para o histórico). Use "data" se disser quando.
 - "reabrir": reabrir um projeto finalizado.
 - "criar_projeto": cadastrar um projeto novo, com "inicio" e "fim" se ditos (ex.: "criar projeto X de hoje até dia 27").
+- "resumo_periodo": enviar as horas do período de envio (dias 1-10, 11-20, 21-fim do mês).
+- "alertas": criar alertas/lembretes dos dias de envio.
+- "marcar_enviado": avisar que já enviou as horas.
 - "resumo_semana": enviar/montar o resumo das horas da semana (use "data" = algum dia da semana pedida; semana passada se disser).
 - "consulta": perguntar totais de horas ou valores.
 - "desconhecido": outra coisa.
@@ -854,6 +862,9 @@ Comando: """${text.replace(/"""/g, '')}"""`;
       finalizar: () => ({intent: 'finalizar', date: okD(r.data), project: pr}),
       reabrir: () => ({intent: 'reabrir', project: pr}),
       criar_projeto: () => ({intent: 'criar_projeto', project: pr, from: okD(r.inicio), to: okD(r.fim), manager: r.gerente ? titleCase(String(r.gerente)) : null}),
+      resumo_periodo: () => ({intent: 'resumo_periodo'}),
+      alertas: () => ({intent: 'alertas'}),
+      marcar_enviado: () => ({intent: 'marcar_enviado'}),
       resumo_semana: () => ({intent: 'resumo_semana', week: weekStart(okD(r.data) || todayISO())}),
       consulta: () => ({intent: 'consulta'})
     };
@@ -898,11 +909,23 @@ function execute(c) {
   if (!c) return {kind: 'err', text: 'Não entendi o comando. Tente, por exemplo: "apontar 8 horas no projeto GRSRJ-466 Oncologia Nova Iguaçu" ou "registra previsão de agenda para Natalia de 10 a 31 de dezembro como projeto principal".'};
   switch (c.intent) {
     case 'desfazer': return undo() ? {kind: 'ok', text: 'Desfeito. Voltei ao estado anterior à última alteração.'} : {kind: 'err', text: 'Não há nada para desfazer nesta sessão.'};
+    case 'alertas': { setTimeout(() => alertsSheet(false), 50); return {kind: 'ok', text: 'Abri a tela para criar os alertas dos dias de envio (10, 20 e 30, no dia útil anterior quando cair em feriado ou fim de semana).'}; }
+    case 'marcar_enviado': {
+      const pp = pendingPeriod() || periodOf(todayISO());
+      const l = S.settings.sentPeriods || (S.settings.sentPeriods = []);
+      if (!l.includes(pp.key)) l.push(pp.key);
+      return {kind: 'ok', text: `Anotado: horas de ${fmtD(pp.from)} a ${fmtDY(pp.to)} marcadas como enviadas.`};
+    }
+    case 'resumo_periodo': {
+      const pp = pendingPeriod() || periodOf(todayISO());
+      if (!sumRange(pp.from, pp.to)) return {kind: 'err', text: `Não há horas apontadas de ${fmtD(pp.from)} a ${fmtDY(pp.to)}.`};
+      return {kind: 'ask', text: rangeSummary(pp), actions: [{label: 'Enviar no WhatsApp', primary: true, run: () => { setTimeout(() => sendSheet(pp), 50); return {kind: 'ok', text: 'Abri a tela de envio.'}; }}]};
+    }
     case 'resumo_semana': {
       const ws = c.week || weekStart(todayISO());
       const txt = weekSummary(ws, false);
       if (!sumRange(ws, addDays(ws, 6))) return {kind: 'err', text: `Não há horas apontadas na semana de ${fmtD(ws)} a ${fmtDY(addDays(ws, 6))}.`};
-      return {kind: 'ask', text: txt, actions: [{label: 'Enviar por WhatsApp ou e-mail', primary: true, run: () => { setTimeout(() => sendSheet(ws), 50); return {kind: 'ok', text: 'Abri as opções de envio.'}; }}]};
+      return {kind: 'ask', text: txt, actions: [{label: 'Enviar no WhatsApp', primary: true, run: () => { setTimeout(() => sendSheet(ws), 50); return {kind: 'ok', text: 'Abri as opções de envio.'}; }}]};
     }
     case 'consulta': {
       const t = todayISO(), ws = weekStart(t), ms = monthStart(t), st = monthStats(ms);
@@ -1084,9 +1107,11 @@ function agendaLine(a) {
 
 /* ============ conversa ============ */
 const pending = new Map();
+let lastCmdAt = 0;
 async function runCommand(text, viaVoice) {
   text = String(text || '').trim();
   if (!text) return;
+  lastCmdAt = Date.now();
   let c = parseCommand(text);
   const entry = {id: uid(), at: Date.now(), q: text, a: '', kind: 'ok'};
   S.log.push(entry);
@@ -1136,7 +1161,7 @@ let view = 'comandos', wk = weekStart(todayISO()), fm = monthStart(todayISO()), 
 function render() {
   const t = todayISO();
   $('#todayLabel').textContent = WD[dow(t)][0].toUpperCase() + WD[dow(t)].slice(1) + ', ' + parseISO(t).getDate() + ' de ' + MN[parseISO(t).getMonth()];
-  renderKpis(); renderLog(); renderExamples();
+  renderKpis(); renderDue(); renderLog(); renderExamples();
   if (view === 'horas') renderWeek();
   if (view === 'previsao') renderForecast();
   if (view === 'projetos') renderProjects();
@@ -1157,7 +1182,9 @@ const EXAMPLES = [
   'ajuste a agenda de 10 a 25 de dezembro da Natalia como projeto Beira Leito',
   'criar projeto Beira Leito de hoje até dia 27',
   'finalizar projeto Beira Leito',
+  'enviar minhas horas',
   'enviar resumo da semana',
+  'criar alertas de envio',
   'quantas horas eu tenho?'
 ];
 function renderExamples() {
@@ -1317,50 +1344,134 @@ function armDelete(btn, fn) {
   };
 }
 /* ============ resumo semanal ============ */
-function weekSummary(ws, withMoney) {
-  const we = addDays(ws, 6);
-  const es = S.entries.filter(e => e.date >= ws && e.date <= we);
+/* ============ resumo e prazos de envio ============ */
+function rangeSummary(R) {
+  const es = S.entries.filter(e => e.date >= R.from && e.date <= R.to);
   const byP = new Map();
   for (const e of es) { if (!byP.has(e.projectId)) byP.set(e.projectId, []); byP.get(e.projectId).push(e); }
-  const lines = [`Horas da semana · ${fmtD(ws)} a ${fmtDY(we)}`, ''];
-  let tot = 0, val = 0;
-  const rows = [...byP.entries()].map(([pid, list]) => ({p: proj(pid), list, h: list.reduce((a, e) => a + e.hours, 0)})).sort((a, b) => b.h - a.h);
+  const lines = [R.title, ''];
+  let tot = 0;
+  const rows = [...byP.entries()].map(([pid, list]) => ({p: proj(pid), pid, list, h: list.reduce((a, e) => a + e.hours, 0)})).sort((a, b) => b.h - a.h);
   for (const r of rows) {
-    const v = r.h * rateOf(r.p); tot += r.h; val += v;
-    lines.push(`${pLabel(r.p)}: ${fmtH(r.h)}${withMoney ? ' · ' + money(v) : ''}`);
+    tot += r.h;
+    lines.push(`${pLabel(r.p)}: ${fmtH(r.h)}`);
     const days = [...new Set(r.list.map(e => e.date))].sort();
-    lines.push('   ' + days.map(d => `${WD[dow(d)]} ${fmtD(d)}: ${fmtH(hoursOn(r.p ? r.p.id : null, d))}`).join(' | '));
+    lines.push('   ' + days.map(d => `${WD[dow(d)]} ${fmtD(d)}: ${fmtH(hoursOn(r.pid, d))}`).join(' | '));
   }
-  lines.push('', `Total da semana: ${fmtH(tot)}${withMoney ? ' · ' + money(val) : ''}`);
+  lines.push('', `Total do período: ${fmtH(tot)}`);
   return lines.join('\n');
 }
-function sendSheet(ws) {
+const weekRange = ws => ({from: ws, to: addDays(ws, 6), title: `Horas da semana · ${fmtD(ws)} a ${fmtDY(addDays(ws, 6))}`, key: 'w:' + ws});
+function weekSummary(ws) { return rangeSummary(weekRange(ws)).replace('Total do período:', 'Total da semana:'); }
+
+// Somente feriados nacionais (incluindo Sexta-feira Santa).
+function easter(y) {
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mo = Math.floor((h + l - 7 * m + 114) / 31), da = ((h + l - 7 * m + 114) % 31) + 1;
+  return `${y}-${pad(mo)}-${pad(da)}`;
+}
+const _hol = {};
+function holidays(y) {
+  if (_hol[y]) return _hol[y];
+  const set = new Set(['01-01', '04-21', '05-01', '09-07', '10-12', '11-02', '11-15', '11-20', '12-25'].map(x => `${y}-${x}`));
+  const e = easter(y);
+  set.add(addDays(e, -2));
+  return (_hol[y] = set);
+}
+function extraHolidays() { return String(S.settings.extraHolidays || '').split(/[,;\s]+/).map(x => x.trim()).filter(x => /^\d{1,2}\/\d{1,2}$/.test(x)).map(x => { const [d, m] = x.split('/'); return pad(+m) + '-' + pad(+d); }); }
+const isBusinessDay = d => isWeekday(d) && !holidays(+d.slice(0, 4)).has(d);
+function periodsOfMonth(y, m) {
+  const last = daysIn(y, m);
+  return [10, 20, 30].map((n, i) => {
+    const nominal = mk(y, m, Math.min(n, last));
+    let due = nominal; while (!isBusinessDay(due)) due = addDays(due, -1);
+    // dia 31 entra no período seguinte (o prazo é sempre dia 30)
+    const prevLast = m === 1 ? 31 : daysIn(y, m - 1);
+    const from = i === 0 ? addDays(mk(y, m, 1), prevLast > 30 ? -1 : 0) : mk(y, m, i === 1 ? 11 : 21), to = nominal;
+    return {key: `p:${y}-${pad(m)}-${i + 1}`, from, to, due, title: `Horas de ${fmtD(from)} a ${fmtDY(to)}`};
+  });
+}
+function periodsAround(t, back, fwd) {
+  const out = [];
+  for (let k = -back; k <= fwd; k++) { const ms = addMonths(monthStart(t), k); out.push(...periodsOfMonth(+ms.slice(0, 4), +ms.slice(5, 7))); }
+  return out;
+}
+const periodOf = d => periodsAround(d, 0, 1).find(p => d >= p.from && d <= p.to);
+const nextDue = () => { const t = todayISO(); return periodsAround(t, 0, 2).find(p => p.due >= t && !(S.settings.sentPeriods || []).includes(p.key)); };
+const isSent = R => (S.settings.sentPeriods || []).includes(R.key);
+
+const waDigits = v => { let d = String(v || '').replace(/\D/g, ''); if (d.length === 10 || d.length === 11) d = '55' + d; return d; };
+function sendSheet(R, auto) {
+  if (typeof R === 'string') R = weekRange(R);
   const canShare = !window.claude && navigator.share;
-  openSheet(`<h3>Enviar resumo da semana</h3>
-    <div class="muted small">${esc(fmtD(ws))} a ${esc(fmtDY(addDays(ws, 6)))}. Você pode editar o texto antes de enviar.</div>
-    <div class="field"><label for="sTxt">Texto</label><textarea id="sTxt" rows="10" style="border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--surface-2);width:100%;font-size:13.5px"></textarea></div>
+  const isPeriod = R.key.startsWith('p:');
+  const markSent = () => { if (isPeriod) { const l = S.settings.sentPeriods || (S.settings.sentPeriods = []); if (!l.includes(R.key)) l.push(R.key); if (l.length > 60) l.splice(0, l.length - 60); persist(); renderDue(); } };
+  const late = isPeriod && R.due < todayISO();
+  openSheet(`<h3>${auto ? (late ? 'Envio de horas atrasado' : 'Hoje é dia de enviar as horas') : 'Enviar horas'}</h3>
+    <div class="muted small">${esc(fmtD(R.from))} a ${esc(fmtDY(R.to))}${isPeriod ? ` · prazo ${esc(fmtDay(R.due))}` : ''}. Você pode editar o texto antes de enviar.</div>
+    <div class="field"><label for="sTxt">Texto</label><textarea id="sTxt" rows="9" style="border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--surface-2);width:100%;font-size:13.5px"></textarea></div>
+    <div class="field"><label for="sNum">Número do WhatsApp (opcional, com DDD)</label><input id="sNum" type="tel" inputmode="tel" placeholder="Em branco: você escolhe o contato no WhatsApp" value="${esc(S.settings.waNumber || '')}"></div>
     <div class="acts" style="justify-content:stretch">
-      <a class="btn pri" id="sWa" target="_blank" rel="noopener" style="flex:1;text-align:center;text-decoration:none">WhatsApp</a>
-      <a class="btn" id="sMail" style="flex:1;text-align:center;text-decoration:none;color:inherit">E-mail</a>
+      <a class="btn pri" id="sWa" target="_blank" rel="noopener" style="flex:2;text-align:center;text-decoration:none">Enviar no WhatsApp</a>
       ${canShare ? '<button type="button" class="btn" id="sShare" style="flex:1">Mais opções</button>' : ''}
       <button type="button" class="btn" id="sCopy" style="flex:1">Copiar</button>
     </div>
-    <div class="acts"><button type="button" class="btn ghost" data-close>Fechar</button></div>`, sh => {
-    const ta = sh.querySelector('#sTxt');
-    const sync = () => {
-      sh.querySelector('#sWa').href = 'https://wa.me/?text=' + encodeURIComponent(ta.value);
-      sh.querySelector('#sMail').href = 'mailto:?subject=' + encodeURIComponent(`Horas da semana ${fmtD(ws)} a ${fmtDY(addDays(ws, 6))}`) + '&body=' + encodeURIComponent(ta.value);
-    };
-    ta.value = weekSummary(ws, false); sync();
+    <div class="acts">${isPeriod && !isSent(R) ? '<button type="button" class="btn ghost" id="sSkip">Já enviei</button>' : ''}<button type="button" class="btn ghost" data-close>${auto ? 'Depois' : 'Fechar'}</button></div>`, sh => {
+    const ta = sh.querySelector('#sTxt'), num = sh.querySelector('#sNum');
+    const sync = () => { const d = waDigits(num.value); sh.querySelector('#sWa').href = 'https://wa.me/' + (d.length >= 12 ? d : '') + '?text=' + encodeURIComponent(ta.value); };
+    ta.value = R.key.startsWith('w:') ? weekSummary(R.from) : rangeSummary(R); sync();
     ta.addEventListener('input', sync);
+    num.addEventListener('input', sync);
+    num.addEventListener('change', () => { S.settings.waNumber = num.value.trim() || null; persist(); });
+    sh.querySelector('#sWa').addEventListener('click', () => { markSent(); if (isPeriod) toast('Marcado como enviado'); });
     const sb = sh.querySelector('#sShare');
-    if (sb) sb.onclick = () => { navigator.share({title: 'Horas da semana', text: ta.value}).catch(() => {}); };
+    if (sb) sb.onclick = () => { navigator.share({title: R.title, text: ta.value}).then(markSent).catch(() => {}); };
+    const sk = sh.querySelector('#sSkip');
+    if (sk) sk.onclick = () => { markSent(); closeSheet(); toast('Marcado como enviado'); };
     sh.querySelector('#sCopy').onclick = () => {
       const fb = () => { ta.focus(); ta.select(); toast('Texto selecionado. Copie com o menu do aparelho.'); };
-      try { navigator.clipboard.writeText(ta.value).then(() => toast('Resumo copiado'), fb); } catch (e) { fb(); }
+      try { navigator.clipboard.writeText(ta.value).then(() => { markSent(); toast('Resumo copiado'); }, fb); } catch (e) { fb(); }
     };
   });
 }
+// A partir do meio-dia do dia de envio, toda vez que o app abre, pergunta até ser marcado como enviado.
+function pendingPeriod() {
+  const t = todayISO(), h = new Date().getHours();
+  const firstUse = S.entries.map(e => e.date).sort()[0];
+  if (!firstUse) return null;
+  return periodsAround(t, 2, 0).find(p => (p.due < t || (p.due === t && h >= 12)) && p.to >= firstUse && !isSent(p) && sumRange(p.from, p.to) > 0) || null;
+}
+function maybeAutoSummary() {
+  if ($('#sheetHost').firstElementChild) return;
+  if (document.activeElement === cmdEl || cmdEl.value.trim() || (dict && dict.active()) || Date.now() - lastCmdAt < 5000) return;
+  const p = pendingPeriod();
+  if (p) { sendSheet(p, true); return; }
+  const later = S.settings.remindersAskedLater;
+  if (!S.settings.remindersAsked && S.entries.length && !(later && addDays(later, 7) > todayISO())) alertsSheet(true);
+}
+const ICS_URL = 'https://andersonfssantiago.github.io/minhas-horas/alertas-envio-horas.ics';
+function alertsSheet(auto) {
+  const list = periodsAround(todayISO(), 0, 3).filter(p => p.due >= todayISO()).slice(0, 6);
+  openSheet(`<h3>Criar alertas dos dias de envio?</h3>
+    <p class="small muted" style="margin:0">As horas são enviadas nos dias 10, 20 e 30. Quando cai em feriado ou fim de semana, o envio passa para o dia útil anterior. O alerta toca ao meio-dia.</p>
+    <div class="note"><b>Próximos envios:</b><br>${list.map(p => `${esc(fmtDay(p.due))} · horas de ${esc(fmtD(p.from))} a ${esc(fmtD(p.to))}`).join('<br>')}</div>
+    <p class="small muted" style="margin:0">O iPhone não deixa um app da web criar itens no app Lembretes, então os alertas vão para o <b>Calendário</b> do iPhone, com aviso ao meio-dia de cada data até o fim de 2028. Toque em "Criar alertas" e depois em <b>Adicionar Todos</b>.</p>
+    <div class="acts"><button type="button" class="btn ghost" id="aNo">${auto ? 'Não perguntar de novo' : 'Fechar'}</button>${auto ? '<button type="button" class="btn" data-close id="aLater">Agora não</button>' : ''}<a class="btn pri" id="aYes" href="${ICS_URL}" target="_blank" rel="noopener" style="text-decoration:none">Criar alertas</a></div>`, sh => {
+    sh.querySelector('#aYes').addEventListener('click', () => { S.settings.remindersAsked = 'sim'; persist(); setTimeout(closeSheet, 300); });
+    sh.querySelector('#aNo').onclick = () => { if (auto) { S.settings.remindersAsked = 'nao'; persist(); } closeSheet(); };
+    const lt = sh.querySelector('#aLater'); if (lt) lt.addEventListener('click', () => { S.settings.remindersAskedLater = todayISO(); persist(); });
+  });
+}
+function renderDue() {
+  const el = $('#dueLine'); if (!el) return;
+  const p = pendingPeriod(), n = nextDue();
+  if (p) { el.innerHTML = `<b>Envio pendente:</b> horas de ${esc(fmtD(p.from))} a ${esc(fmtD(p.to))} (prazo ${esc(fmtDay(p.due))}) <button type="button" class="btn pri" id="dueSend" style="margin-left:6px;padding:5px 10px">Enviar</button>`; el.className = 'due late'; }
+  else if (n) { el.innerHTML = `Próximo envio de horas: <b>${esc(fmtDay(n.due))}</b> ao meio-dia · ${esc(fmtD(n.from))} a ${esc(fmtD(n.to))}`; el.className = 'due'; }
+  else el.textContent = '';
+  const b = $('#dueSend'); if (b) b.onclick = () => sendSheet(p, true);
+}
+$('#pSend').onclick = () => { const p = periodOf(todayISO()); if (!sumRange(p.from, p.to)) { toast(`Não há horas de ${fmtD(p.from)} a ${fmtD(p.to)}`); return; } sendSheet(p); };
 $('#wSend').onclick = () => {
   if (!sumRange(wk, addDays(wk, 6))) { toast('Não há horas apontadas nesta semana'); return; }
   sendSheet(wk);
@@ -1450,13 +1561,7 @@ function agendaSheet(aid) {
 }
 
 /* ============ backup ============ */
-$('#autoSave').onclick = () => {
-  const v = $('#autoUrl').value.trim();
-  if (v && !/^https:\/\/script\.google(?:usercontent)?\.com\//.test(v)) { toast('Esse endereço não é de uma planilha Google de envio'); return; }
-  S.settings.autoUrl = v || null; persist(); renderAuto();
-  if (v) pushCloud(true); else toast('Envio automático desligado');
-};
-$('#autoSync').onclick = () => { if (!S.settings.autoUrl) { toast('Cole e salve o endereço primeiro'); return; } pushCloud(true); };
+$('#setAlerts').onclick = () => alertsSheet(false);
 $('#bkCopy').onclick = () => {
   const data = JSON.stringify({app: 'minhas-horas', ...S, log: []});
   const fallback = () => openSheet(`<h3>Backup</h3><p class="small muted" style="margin:0">Selecione todo o texto abaixo e copie.</p><div class="field"><label for="bkTxt">Dados</label><textarea id="bkTxt" rows="8" style="border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--surface-2);width:100%" readonly></textarea></div><div class="acts"><button type="button" class="btn pri" data-close>Fechar</button></div>`, sh => { const ta = sh.querySelector('#bkTxt'); ta.value = data; setTimeout(() => ta.select(), 60); });
@@ -1480,8 +1585,8 @@ function go() {
   let h = location.hash.replace('#', '');
   if (h === 'enviar-resumo') {
     // Atalho para abrir direto o envio do resumo (ex.: automação do app Atalhos do iPhone)
-    h = 'horas'; wk = weekStart(todayISO());
-    setTimeout(() => { if (sumRange(wk, addDays(wk, 6))) sendSheet(wk); else toast('Não há horas apontadas nesta semana'); }, 120);
+    h = 'horas';
+    setTimeout(() => { const pp = pendingPeriod() || periodOf(todayISO()); if (sumRange(pp.from, pp.to)) sendSheet(pp); else toast('Não há horas apontadas neste período'); }, 120);
   }
   view = VIEWS.includes(h) ? h : 'comandos';
   for (const v of VIEWS) $('#v-' + v).hidden = v !== view;
@@ -1626,10 +1731,12 @@ function setupMic() {
 /* ============ início ============ */
 go();
 autoGrow();
+setTimeout(maybeAutoSummary, 900);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(maybeAutoSummary, 600); });
 (async () => {
   const c = window.claude;
   if (!c || typeof c.use !== 'function') {
-    setSync('local'); dict = webSpeech(); tts = webTts(); setupMic(); $('#autoCard').hidden = false;
+    setSync('local'); dict = webSpeech(); tts = webTts(); setupMic();
     try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
     if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
     return;
