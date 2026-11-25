@@ -1,0 +1,89 @@
+/**
+ * Minhas Hora$$ · Envio automático do resumo semanal por e-mail
+ *
+ * 1. Ajuste as 4 linhas de CONFIGURAÇÃO abaixo.
+ * 2. Clique em Implantar > Nova implantação > App da Web
+ *    (Executar como: Eu · Quem pode acessar: Qualquer pessoa) e copie o endereço que termina em /exec.
+ * 3. No menu de funções lá em cima, escolha "instalar" e clique em Executar (autorize quando pedir).
+ * 4. Cole o endereço /exec no app, em Previsão > Envio automático por e-mail.
+ */
+
+// ===== CONFIGURAÇÃO =====
+const DESTINATARIOS = 'anderson.santos@partners.mv.com.br'; // um ou mais, separados por vírgula
+const DIA = ScriptApp.WeekDay.FRIDAY;               // MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY
+const HORA = 18;                                    // 0 a 23 (horário de Brasília)
+// ========================
+
+const ABA = 'Horas';
+
+/** Recebe a cópia das horas enviada pelo app. */
+function doPost(e) {
+  const d = JSON.parse(e.postData.contents);
+  if (!d || d.app !== 'minhas-horas') return ContentService.createTextOutput('ignorado');
+  const projetos = {};
+  (d.projects || []).forEach(p => projetos[p.id] = p);
+  const linhas = (d.entries || []).map(en => {
+    const p = projetos[en.projectId] || {name: 'Sem projeto', code: '', rate: null};
+    return [en.date, p.code ? p.code + ' · ' + p.name : p.name, Number(en.hours) || 0];
+  }).sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName(ABA) || ss.insertSheet(ABA);
+  sh.clearContents();
+  sh.getRange(1, 1, 1, 3).setValues([['Data', 'Projeto', 'Horas']]);
+  sh.getRange('A:A').setNumberFormat('@');
+  if (linhas.length) sh.getRange(2, 1, linhas.length, 3).setValues(linhas);
+  PropertiesService.getScriptProperties().setProperty('ultimaCopia', d.sentAt || new Date().toISOString());
+  return ContentService.createTextOutput('ok');
+}
+
+function doGet() {
+  return ContentService.createTextOutput('Minhas Hora$$: planilha de envio ativa.');
+}
+
+/** Monta e envia o resumo da semana atual (segunda a domingo). */
+function enviarResumo() {
+  const tz = 'America/Sao_Paulo';
+  const hoje = new Date();
+  const dow = Number(Utilities.formatDate(hoje, tz, 'u')); // 1 = segunda ... 7 = domingo
+  const ini = new Date(hoje.getTime() - (dow - 1) * 864e5);
+  const fim = new Date(ini.getTime() + 6 * 864e5);
+  const iso = dt => Utilities.formatDate(dt, tz, 'yyyy-MM-dd');
+  const br = s => s.slice(8, 10) + '/' + s.slice(5, 7);
+  const a = iso(ini), b = iso(fim);
+  const WD = ['', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
+  const fmtH = h => (Math.round(h * 100) / 100).toString().replace('.', ',') + 'h';
+
+  const sh = SpreadsheetApp.getActive().getSheetByName(ABA);
+  const dados = sh ? sh.getDataRange().getValues().slice(1) : [];
+  const semana = dados.filter(r => String(r[0]) >= a && String(r[0]) <= b);
+  const porProjeto = {};
+  semana.forEach(r => {
+    const k = r[1];
+    porProjeto[k] = porProjeto[k] || {h: 0, dias: {}};
+    porProjeto[k].h += Number(r[2]);
+    porProjeto[k].dias[r[0]] = (porProjeto[k].dias[r[0]] || 0) + Number(r[2]);
+  });
+  const nomes = Object.keys(porProjeto).sort((x, y) => porProjeto[y].h - porProjeto[x].h);
+  if (!nomes.length) return; // sem horas na semana: não envia
+
+  let tot = 0;
+  const linhas = ['Horas da semana · ' + br(a) + ' a ' + br(b) + '/' + b.slice(0, 4), ''];
+  nomes.forEach(n => {
+    const p = porProjeto[n]; tot += p.h;
+    linhas.push(n + ': ' + fmtH(p.h));
+    linhas.push('   ' + Object.keys(p.dias).sort().map(d => {
+      const w = Number(Utilities.formatDate(new Date(d + 'T12:00:00-03:00'), tz, 'u'));
+      return WD[w] + ' ' + br(d) + ': ' + fmtH(p.dias[d]);
+    }).join(' | '));
+  });
+  linhas.push('', 'Total da semana: ' + fmtH(tot));
+  linhas.push('', 'Enviado automaticamente pelo Minhas Hora$$.');
+
+  MailApp.sendEmail(DESTINATARIOS, 'Horas da semana ' + br(a) + ' a ' + br(b), linhas.join('\n'));
+}
+
+/** Rode uma vez: cria o agendamento semanal (apaga agendamentos antigos deste script). */
+function instalar() {
+  ScriptApp.getProjectTriggers().forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('enviarResumo').timeBased().onWeekDay(DIA).atHour(HORA).inTimezone('America/Sao_Paulo').create();
+}
