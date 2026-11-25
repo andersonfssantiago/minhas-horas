@@ -1354,9 +1354,10 @@ function rangeSummary(R) {
   const rows = [...byP.entries()].map(([pid, list]) => ({p: proj(pid), pid, list, h: list.reduce((a, e) => a + e.hours, 0)})).sort((a, b) => b.h - a.h);
   for (const r of rows) {
     tot += r.h;
-    lines.push(`${pLabel(r.p)}: ${fmtH(r.h)}`);
+    lines.push(`${r.p ? r.p.name : 'Sem projeto'}: ${fmtH(r.h)}`, '');
     const days = [...new Set(r.list.map(e => e.date))].sort();
-    lines.push('   ' + days.map(d => `${WD[dow(d)]} ${fmtD(d)}: ${fmtH(hoursOn(r.pid, d))}`).join(' | '));
+    for (const d of days) lines.push(`* ${WD[dow(d)]} ${fmtD(d)}: ${fmtH(hoursOn(r.pid, d))}`);
+    lines.push('');
   }
   lines.push('', `Total do período: ${fmtH(tot)}`);
   return lines.join('\n');
