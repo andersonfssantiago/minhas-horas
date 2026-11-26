@@ -729,6 +729,29 @@ function parseCommand(input) {
     if (pm) ref = splitCode(pm.go(1));
     return {intent: 'valor', value: v ? parseFloat(v[1].replace(',', '.')) : null, project: ref};
   }
+  // Estender / ampliar / prorrogar a data de término de um projeto
+  const EXT_RE = /\b(estend\w*|estenda|amplia\w*|amplie\w*|prorrog\w*|prorrogue\w*|estic\w*|adi[ae]\w*|alonga\w*|alongue\w*|aument\w*|prolong\w*|extend\w*)\b/;
+  if (EXT_RE.test(n) && !/\b(valor|taxa|preco|hora|horas)\b/.test(n)) {
+    const t = new Txt(raw);
+    let addN = null, unit = null, m;
+    if ((m = t.take(/\b(?:por\s+)?(?:mais\s+)?(\d{1,3})\s+(dias?|semanas?|mes|meses)(?:\s+(?:a\s+mais|uteis))?\b/))) { addN = +m[1]; unit = m[2][0] === 'd' ? 'd' : m[2][0] === 's' ? 'w' : 'm'; }
+    let date;
+    if ((m = t.take(new RegExp('\\b(?:ate\\s+)?(?:o\\s+|ao\\s+)?(?:fim|final)\\s+(?:de|do|da)\\s+(?:mes\\s+(?:de\\s+)?)?' + MRE + '(?:\\s+de\\s+(\\d{4}))?'), true))) {
+      const now = todayISO(); let y = +m[2] || +now.slice(0, 4); if (!m[2] && MONTHS[m[1]] < +now.slice(5, 7)) y++;
+      date = monthEnd(mk(y, MONTHS[m[1]], 1));
+    } else if ((m = t.take(/\b(?:ate\s+)?(?:o\s+|ao\s+)?(?:fim|final)\s+(?:do|deste|desse)\s+mes\b/, true))) date = monthEnd(todayISO());
+    else if ((m = t.take(/\b(?:ate\s+)?(?:o\s+|ao\s+)?(?:fim|final)\s+do\s+proximo\s+mes\b|\b(?:ate\s+)?(?:o\s+|ao\s+)?(?:fim|final)\s+do\s+mes\s+que\s+vem\b/, true))) date = monthEnd(addMonths(todayISO(), 1));
+    else { t.take(/\b(?:ate|para|pra|em)\s+(?=(?:o\s+)?(?:dia\s+)?\d)/); date = parseDate(t, 'future'); }
+    t.take(/^.*?\b(?:estend\w*|estenda|amplia\w*|amplie\w*|prorrog\w*|prorrogue\w*|estic\w*|adi[ae]\w*|alonga\w*|alongue\w*|aument\w*|prolong\w*|extend\w*)\b/);
+    let rest = t.rest().replace(/["“”]/g, '')
+      .replace(/^(?:(?:o|a)\s+)?(?:(?:data|prazo|periodo|período|vigencia|vigência)\s+(?:de\s+)?(?:termino\s+|término\s+|fim\s+|final\s+)?(?:do|da|de)\s+)?/i, '')
+      .replace(/^(?:(?:o|a)\s+)?(?:(?:termino|término|fim|final)\s+(?:do|da|de)\s+)?/i, '')
+      .replace(/^(?:o\s+)?projeto\s+/i, '')
+      .replace(/\s+(?:ate|até|para|pra|por|em|no|na|dia|o|a|mais|de|do|da)(?:\s+(?:ate|até|para|pra|por|em|no|na|dia|o|a|mais|de|do|da))*\s*$/i, '')
+      .replace(/[\s,.;:!?]+$/g, '').trim();
+    if (/^(?:o|a|data|prazo|termino|término)?$/i.test(rest)) rest = '';
+    return {intent: 'estender', date: date || null, dateInvalid: date === null, addN, unit, project: rest ? splitCode(rest) : null};
+  }
   if (/\b(finaliz\w*|encerr\w*|conclu\w*|fech\w*|arquiv\w*|reabr\w*|reativ\w*)\b/.test(n) && /\bprojeto\b/.test(n) && !/\bhoras?\b/.test(n) && !/\b(previs\w*|previsto)\b/.test(n)) {
     const reopen = /\b(reabr\w*|reativ\w*)\b/.test(n);
     const t = new Txt(raw);
@@ -831,6 +854,7 @@ Intenções possíveis:
 - "principal": definir qual é o projeto principal.
 - "valor": mudar o valor por hora (global, ou de um projeto).
 - "termino": informar a data de término prevista de um projeto.
+- "estender": estender/ampliar/prorrogar a data de término de um projeto ("fim" = nova data, se dita; "mais_dias" = dias a acrescentar, se disser "por mais N dias/semanas").
 - "finalizar": finalizar/encerrar um projeto (vai para o histórico). Use "data" se disser quando.
 - "reabrir": reabrir um projeto finalizado.
 - "criar_projeto": cadastrar um projeto novo, com "inicio" e "fim" se ditos (ex.: "criar projeto X de hoje até dia 27").
@@ -859,6 +883,7 @@ Comando: """${text.replace(/"""/g, '')}"""`;
       principal: () => ({intent: 'principal', project: pr}),
       valor: () => ({intent: 'valor', value: +r.valor || null, project: pr}),
       termino: () => ({intent: 'termino', date: okD(r.fim) || okD(r.data), project: pr}),
+      estender: () => ({intent: 'estender', date: okD(r.fim) || okD(r.data), addN: +r.mais_dias || null, unit: 'd', project: pr}),
       finalizar: () => ({intent: 'finalizar', date: okD(r.data), project: pr}),
       reabrir: () => ({intent: 'reabrir', project: pr}),
       criar_projeto: () => ({intent: 'criar_projeto', project: pr, from: okD(r.inicio), to: okD(r.fim), manager: r.gerente ? titleCase(String(r.gerente)) : null}),
@@ -989,6 +1014,31 @@ function execute(c) {
       if (d.src === 'agenda' && c.to && d.end !== c.to) text += `\nObservação: a agenda deste projeto indica término em ${fmtDY(d.end)} e tem prioridade.`;
       if (!c.to && !d.end) text += `\nEle está sem previsão de término. Diga, por exemplo, "término do projeto ${p.code || p.name} em 31/01".`;
       return {kind: 'ok', undoable: true, text};
+    }
+    case 'estender': {
+      const ex = 'Diga, por exemplo: "estender o projeto Oncologia Nova Iguaçu até 15/12" ou "prorrogar o projeto Oncologia por mais 2 semanas".';
+      if (!c.project) { const ps = S.projects.filter(p => !p.closedAt); if (ps.length === 1) c.project = {code: ps[0].code, name: ps[0].name}; else return {kind: 'err', text: 'Qual projeto você quer estender? ' + ex}; }
+      const p = findProject(c.project);
+      if (!p) return {kind: 'err', text: `Não encontrei o projeto "${c.project.code || c.project.name}". ` + ex};
+      if (p.closedAt) return {kind: 'err', text: `${pLabel(p)} está finalizado. Diga "reabrir o projeto ${p.code || p.name}" e depois peça para estender.`};
+      if (c.dateInvalid) return {kind: 'err', text: 'Essa data não existe. Confira o dia e o mês.'};
+      const d0 = projDates(p), base = d0.end || todayISO();
+      let nd = c.date;
+      if (!nd && c.addN) {
+        if (c.unit === 'd') nd = addDays(base, c.addN);
+        else if (c.unit === 'w') nd = addDays(base, 7 * c.addN);
+        else { const ms = addMonths(base, c.addN), y = +ms.slice(0, 4), mo = +ms.slice(5, 7); nd = mk(y, mo, Math.min(+base.slice(8, 10), daysIn(y, mo))); }
+      }
+      if (!nd) return {kind: 'err', text: `Até quando? ${pLabel(p)} ${d0.end ? 'termina em ' + fmtDY(d0.end) : 'está sem término definido'}. ` + ex};
+      if (d0.end && nd <= d0.end) return {kind: 'err', text: `${pLabel(p)} já termina em ${fmtDY(d0.end)}. Para estender, diga uma data depois dessa. Para antecipar, diga "término do projeto ${p.code || p.name} em ${fmtD(nd)}".`};
+      snapshot();
+      let extra = '';
+      if (d0.src === 'agenda') {
+        const ag = S.agendas.filter(a => a.projectId === p.id).sort((a, b) => a.to < b.to ? 1 : -1)[0];
+        ag.to = nd; extra = `\nA agenda${ag.manager ? ' de ' + ag.manager : ''} também foi estendida até ${fmtD(nd)}.`;
+      }
+      p.end = nd;
+      return {kind: 'ok', undoable: true, text: `Pronto: ${pLabel(p)} ${d0.end ? 'estendido de ' + fmtDY(d0.end) + ' para ' : 'agora termina em '}${fmtDY(nd)}.` + extra};
     }
     case 'termino': {
       if (!c.project) return {kind: 'err', text: 'De qual projeto? Diga, por exemplo: "término do projeto GRSRJ-466 em 31/01".'};
