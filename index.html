@@ -701,6 +701,7 @@ function parseCommand(input) {
   const n = strip(raw);
 
   if (/^(desfaz|desfazer|desfaca|desfaça|voltar)\b/.test(n)) return {intent: 'desfazer'};
+  if (REM_RE.test(n) && /\b\d+(?:[.,]\d+)?\s*(?:horas?|hrs?|h)\b|\bhoras?\b/.test(n) && !/\b(agenda|alertas?|lembretes?)\b/.test(n)) return parseRemover(raw);
   if (/\b(cri\w*|ativ\w*|coloc\w*|configur\w*)\b.*\b(alertas?|lembretes?|avisos?)\b/.test(n)) return {intent: 'alertas'};
   if (/\b(ja\s+)?(enviei|mandei)\b.*\bhoras\b|\bmarc\w*\b.*\b(como\s+)?enviad[ao]s?\b/.test(n)) return {intent: 'marcar_enviado'};
   if (!/\bsemana\b/.test(n) && (/\b(envi\w*|mand\w*|compartilh\w*)\s+(?:as\s+)?(?:minhas\s+)?horas\b/.test(n) || /\bresumo\s+(?:do|da)\s+(periodo|quinzena|decendio|mes)\b/.test(n))) return {intent: 'resumo_periodo'};
@@ -788,6 +789,62 @@ function parseCommand(input) {
   return {intent: 'apontar', hours, date: date === undefined ? null : date, dateInvalid: date === null, mode, project: ref && (ref.code || ref.name) ? ref : null};
 }
 
+const REM_RE = /\b(retir\w*|remov\w*|tir[ae]\w*|tira|apag\w*|exclu\w*|delet\w*|descont\w*|subtra\w*|diminu\w*|zer[ae]\w*)\b/;
+function parseRemover(raw) {
+  const t = new Txt(raw);
+  const hours = parseHours(t);
+  const date = parseDate(t, 'past');
+  t.take(/^\s*(?:por\s+favor\s*,?\s*)?(?:pode\s+)?(?:retir\w*|remov\w*|tir[ae]\w*|tira|apag\w*|exclu\w*|delet\w*|descont\w*|subtra\w*|diminu\w*|zer[ae]\w*)\b/);
+  t.take(/\b(?:apontad|lancad|registrad|colocad|marcad)[ao]s?\b/);
+  t.take(/^\s*(?:(?:todas\s+)?(?:as|os)\s+)?(?:horas?|hrs?)\b/);
+  t.take(/\b(?:horas?)\b/);
+  let rest = t.rest().replace(LEAD_PREP, '').replace(/[\s,.;:!?]+$/g, '').replace(/\s+(?:no|na|do|da|de|em|e)\s*$/i, '').trim();
+  rest = rest.replace(/^(?:(?:no|na|do|da|o|a)\s+)?(?:projeto\s+)?/i, '').trim();
+  const ref = rest && !/^(?:projeto\s+)?principal$/i.test(rest) ? splitCode(rest) : null;
+  return {intent: 'remover', hours, date: date === undefined ? null : date, dateInvalid: date === null, project: ref && (ref.code || ref.name) ? ref : null};
+}
+
+// Vários comandos numa frase: "retire 2 horas do dia 25 e aponte 1 hora no dia 24 e 1 hora no dia 26"
+const CVERB = '(?:apont|lan[cç]|registr|coloc|adicion|acrescent|bot|ponh|ponha|inclu|retir|remov|tir[ae]|tira|apag|exclu|descont|subtra|diminu|cri|cadastr|estend|ampli|prorrog|finaliz|encerr)';
+function splitCompound(text) {
+  const sep = new RegExp('\\s*[,;]?\\s+(?:e\\s+(?:depois\\s+|tamb[eé]m\\s+)?|depois\\s+|tamb[eé]m\\s+)(?=' + CVERB + '[\\p{L}]*)|\\s*[,;]\\s*(?=' + CVERB + '[\\p{L}]*)', 'iu');
+  const parts = text.split(sep).map(x => x && x.trim()).filter(Boolean);
+  const out = [];
+  for (const part of parts) {
+    const subs = part.split(/\s*(?:,|\s+e)\s+(?=(?:mais\s+)?\d+(?:[.,]\d+)?\s*(?:h|hs|hrs?|horas?)\b)/i).filter(Boolean);
+    const verb = (/^\s*(?:por\s+favor\s*,?\s*)?(\S+)/.exec(part) || [])[1] || 'apontar';
+    subs.forEach((x, i) => out.push(i === 0 ? x : verb + ' ' + x));
+  }
+  return out;
+}
+function runCompound(parts) {
+  const cs = []; let lastRef = null, lastH = null;
+  for (const part of parts) {
+    let c = parseCommand(part);
+    if (!c && lastH && new RegExp('^\\s*' + CVERB, 'iu').test(part)) c = parseCommand(part.replace(/^(\s*\S+)/, `$1 ${String(lastH).replace('.', ',')} horas`));
+    if (!c || !['apontar', 'remover', 'termino', 'estender', 'finalizar', 'criar_projeto'].includes(c.intent)) return {kind: 'err', text: `Não entendi esta parte: "${part}". Nada foi alterado.`};
+    if ((c.intent === 'apontar' || c.intent === 'remover') && !c.project && lastRef) c.project = lastRef;
+    if (c.project) lastRef = c.project;
+    if (c.hours) lastH = c.hours;
+    cs.push([part, c]);
+  }
+  const base = undoStack.length;
+  snapshot();
+  const lines = [];
+  for (const [part, c] of cs) {
+    if (c.intent === 'apontar' && c.mode === 'perguntar') c.mode = 'somar';
+    const r = execute(c);
+    if (r.kind !== 'ok') {
+      while (undoStack.length > base + 1) undoStack.pop();
+      undo();
+      return {kind: 'err', text: `Não alterei nada. No trecho "${part}": ${r.text.split('\n')[0]}`};
+    }
+    lines.push('• ' + r.text.replace(/^Pronto:\s*/, '').split('\n')[0] + (r.text.includes('Projeto novo cadastrado') ? ' (projeto novo)' : ''));
+  }
+  while (undoStack.length > base + 1) undoStack.pop();
+  return {kind: 'ok', undoable: true, text: 'Pronto, fiz tudo:\n' + lines.join('\n')};
+}
+
 function parseNewProject(raw) {
   const t = new Txt(raw);
   let principal = false, m;
@@ -853,6 +910,7 @@ Intenções possíveis:
 - "agenda_ajustar": ajustar uma agenda já registrada (mudar projeto, período ou tipo).
 - "principal": definir qual é o projeto principal.
 - "valor": mudar o valor por hora (global, ou de um projeto).
+- "remover": retirar/excluir horas já apontadas de um dia ("horas" = quantas; null = todas).
 - "termino": informar a data de término prevista de um projeto.
 - "estender": estender/ampliar/prorrogar a data de término de um projeto ("fim" = nova data, se dita; "mais_dias" = dias a acrescentar, se disser "por mais N dias/semanas").
 - "finalizar": finalizar/encerrar um projeto (vai para o histórico). Use "data" se disser quando.
@@ -882,6 +940,7 @@ Comando: """${text.replace(/"""/g, '')}"""`;
       agenda_ajustar: () => ({intent: 'agenda_ajustar', manager: r.gerente ? titleCase(String(r.gerente)) : null, project: pr, type: r.tipo === 'paralelo' ? 'paralelo' : r.tipo === 'principal' ? 'principal' : null, from: okD(r.inicio), to: okD(r.fim) || okD(r.inicio), hpd: +r.horas_dia || null}),
       principal: () => ({intent: 'principal', project: pr}),
       valor: () => ({intent: 'valor', value: +r.valor || null, project: pr}),
+      remover: () => ({intent: 'remover', hours: +r.horas || null, date: okD(r.data), project: pr}),
       termino: () => ({intent: 'termino', date: okD(r.fim) || okD(r.data), project: pr}),
       estender: () => ({intent: 'estender', date: okD(r.fim) || okD(r.data), addN: +r.mais_dias || null, unit: 'd', project: pr}),
       finalizar: () => ({intent: 'finalizar', date: okD(r.data), project: pr}),
@@ -957,6 +1016,7 @@ function execute(c) {
       return {kind: 'ok', text: `Hoje: ${fmtH(dayTotal(t))}. Semana: ${fmtH(sumRange(ws, addDays(ws, 6)))}.\nMês: ${fmtH(st.tot.rh)} realizadas = ${money(st.tot.rv)}. Projetado até ${fmtD(st.me)}: ${money(st.tot.rv + st.tot.fv)}.`};
     }
     case 'apontar': return execApontar(c);
+    case 'remover': return execRemover(c);
     case 'agenda_criar': return execAgenda(c, false);
     case 'agenda_ajustar': return execAgenda(c, true);
     case 'principal': {
@@ -1103,6 +1163,29 @@ function execApontar(c, forced) {
   return {kind: 'ok', undoable: true, text};
 }
 
+function execRemover(c) {
+  if (c.dateInvalid) return {kind: 'err', text: 'Essa data não existe. Confira o dia e o mês.'};
+  const date = c.date || todayISO();
+  let p = null;
+  if (c.project) { p = findProject(c.project); if (!p) return {kind: 'err', text: `Não encontrei o projeto "${c.project.code || c.project.name}".`}; }
+  else {
+    const ps = [...new Set(S.entries.filter(e => e.date === date).map(e => e.projectId))].map(proj).filter(Boolean);
+    if (!ps.length) return {kind: 'err', text: `Não há horas apontadas em ${fmtDay(date)}.`};
+    if (ps.length > 1) return {kind: 'ask', text: `Em ${fmtDay(date)} há horas em mais de um projeto. De qual eu retiro${c.hours ? ' ' + fmtH(c.hours) : ''}?`,
+      actions: ps.map(pp => ({label: pLabel(pp), run: () => execRemover(Object.assign({}, c, {project: {code: pp.code, name: pp.name}}))}))};
+    p = ps[0];
+  }
+  const existing = hoursOn(p.id, date);
+  if (!existing) return {kind: 'err', text: `${pLabel(p)} não tem horas apontadas em ${fmtDay(date)}.`};
+  const h = c.hours || existing;
+  if (h > existing + 1e-9) return {kind: 'err', text: `${pLabel(p)} tem só ${fmtH(existing)} em ${fmtDay(date)}. Não dá para retirar ${fmtH(h)}.`};
+  snapshot();
+  const left = Math.round((existing - h) * 100) / 100;
+  S.entries = S.entries.filter(e => !(e.projectId === p.id && e.date === date));
+  if (left > 0) S.entries.push({id: uid(), projectId: p.id, date, hours: left, createdAt: Date.now()});
+  return {kind: 'ok', undoable: true, text: `Pronto: retirei ${fmtH(h)} de ${pLabel(p)}, ${fmtDay(date)}. ` + (left > 0 ? `Ficou com ${fmtH(left)} no dia.` : 'Não ficou nenhuma hora nesse dia.')};
+}
+
 function execAgenda(c, adjust) {
   if (c.rangeError) return {kind: 'err', text: 'Não consegui entender o período. Diga, por exemplo: "de 10 de dezembro até 31 de dezembro" ou "de 15 a 20/12".'};
   if (!adjust) {
@@ -1165,6 +1248,8 @@ async function runCommand(text, viaVoice) {
   let c = parseCommand(text);
   const entry = {id: uid(), at: Date.now(), q: text, a: '', kind: 'ok'};
   S.log.push(entry);
+  const parts = splitCompound(preNumbers(text));
+  if (parts.length > 1) { applyReply(entry, runCompound(parts), viaVoice); return; }
   if (!c && sample) { entry.a = 'Interpretando…'; entry.kind = 'wait'; renderLog(); c = await aiParse(text); }
   applyReply(entry, execute(c), viaVoice);
 }
@@ -1507,8 +1592,9 @@ function alertsSheet(auto) {
   openSheet(`<h3>Criar alertas dos dias de envio?</h3>
     <p class="small muted" style="margin:0">As horas são enviadas nos dias 10, 20 e 30. Quando cai em feriado ou fim de semana, o envio passa para o dia útil anterior. O alerta toca ao meio-dia.</p>
     <div class="note"><b>Próximos envios:</b><br>${list.map(p => `${esc(fmtDay(p.due))} · horas de ${esc(fmtD(p.from))} a ${esc(fmtD(p.to))}`).join('<br>')}</div>
-    <p class="small muted" style="margin:0">O iPhone não deixa um app da web criar itens no app Lembretes, então os alertas vão para o <b>Calendário</b> do iPhone, com aviso ao meio-dia de cada data até o fim de 2028. Toque em "Criar alertas" e depois em <b>Adicionar Todos</b>.</p>
-    <div class="acts"><button type="button" class="btn ghost" id="aNo">${auto ? 'Não perguntar de novo' : 'Fechar'}</button>${auto ? '<button type="button" class="btn" data-close id="aLater">Agora não</button>' : ''}<a class="btn pri" id="aYes" href="${ICS_URL}" target="_blank" rel="noopener" style="text-decoration:none">Criar alertas</a></div>`, sh => {
+    <p class="small muted" style="margin:0">O iPhone não deixa um app da web criar itens no app Lembretes, então os alertas vão para o <b>Calendário</b> do iPhone, com aviso ao meio-dia de cada data até o fim de 2028. Toque em "Criar alertas" e depois em <b>Assinar</b>. Na tela seguinte, <b>desligue "Remover Alertas"</b> (senão o iPhone não avisa) e toque em OK. As datas aparecem no Calendário, no calendário "Envio de horas".</p>
+    <div class="acts"><button type="button" class="btn ghost" id="aNo">${auto ? 'Não perguntar de novo' : 'Fechar'}</button>${auto ? '<button type="button" class="btn" data-close id="aLater">Agora não</button>' : ''}<a class="btn pri" id="aYes" href="${ICS_URL.replace(/^https:/, 'webcal:')}" style="text-decoration:none">Criar alertas</a></div>
+    <p class="small muted" style="margin:0">Não abriu nada? <a href="${ICS_URL}" target="_blank" rel="noopener" id="aFile">Baixar o arquivo de alertas</a> ou copie este endereço e cole no Safari: <span style="user-select:all;word-break:break-all">${ICS_URL}</span></p>`, sh => {
     sh.querySelector('#aYes').addEventListener('click', () => { S.settings.remindersAsked = 'sim'; persist(); setTimeout(closeSheet, 300); });
     sh.querySelector('#aNo').onclick = () => { if (auto) { S.settings.remindersAsked = 'nao'; persist(); } closeSheet(); };
     const lt = sh.querySelector('#aLater'); if (lt) lt.addEventListener('click', () => { S.settings.remindersAskedLater = todayISO(); persist(); });
